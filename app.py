@@ -68,7 +68,9 @@ class ListaComprasPro:
         altura_total = y_cabecalho + (len(itens) * espaco_item) + 100
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
+        
         try:
+            # seguisym.ttf costuma ter o ícone do carrinho no Windows
             font_bold = ImageFont.truetype("arialbd.ttf", 26)
             font_norm = ImageFont.truetype("arial.ttf", 20)
         except:
@@ -78,8 +80,8 @@ class ListaComprasPro:
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
         
-        d.text((40, 35), "LISTA DE COMPRAS", fill=(0, 0, 0), font=font_bold)
-        d.text((40, 75), f"DATA: {data_br}", fill=(100, 100, 100), font=font_norm)
+        d.text((40, 35), "Lista de Compras", fill=(0, 0, 0), font=font_bold)
+        d.text((40, 75), f"{data_br}", fill=(100, 100, 100), font=font_norm)
         
         y_linha = 120
         if motivo_texto:
@@ -184,4 +186,5 @@ with st.sidebar:
         st.download_button("🖼️ IMAGEM", img_bytes, "lista.png", "image/png", use_container_width=True)
 
 st.markdown("---")
+
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒 Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
