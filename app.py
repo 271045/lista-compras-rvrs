@@ -1,20 +1,24 @@
 # -*- coding: utf-8 -*-
-# 1. Primeiro todos os imports (o motor do seu app)
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import os
 from datetime import datetime
 import urllib.parse
 import unicodedata
 import io
 
-# 2. Logo após os imports, carregamos a imagem e configuramos a página
-# ATENÇÃO: Use o nome "meu-icone.png" se você seguiu o passo de mudar o nome para fugir da coroa
 try:
-    caminho_icone = os.path.join(os.getcwd(), "meu-icone.png")
+    import pytz
+except ImportError:
+    pass
+
+# 1. Configuração da Página
+try:
+    # Tenta carregar o favicon personalizado
+    caminho_icone = os.path.join(os.getcwd(), "favicon.png")
     img_favicon = Image.open(caminho_icone)
 except:
-    img_favicon = "🛒" # Se o arquivo não for achado, usa o emoji
+    img_favicon = "🛒"
 
 st.set_page_config(
     page_title="🛒Lista Compras ®rvrs",
@@ -23,18 +27,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 3. O restante do seu código (Classe ListaComprasPro, etc) vem daqui para baixo
-from datetime import datetime
-import urllib.parse
-import unicodedata
-import io
-from PIL import Image, ImageDraw, ImageFont
-
-try:
-    import pytz
-except ImportError:
-    pass
-
+# 2. Funções Auxiliares
 def remover_acentos(texto):
     if not texto: return ""
     return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
@@ -85,16 +78,15 @@ class ListaComprasPro:
         st.session_state.reset_trigger += 1
         st.rerun()
         
-    def gerar_imagem(self, itens, motivo_texto):
+    def gerar_imagem(self, itens_com_qtd, motivo_texto):
         largura = 600
         espaco_item = 40
         y_cabecalho = 180 if motivo_texto else 130
-        altura_total = y_cabecalho + (len(itens) * espaco_item) + 100
+        altura_total = y_cabecalho + (len(itens_com_qtd) * espaco_item) + 100
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
         
         try:
-            # seguisym.ttf costuma ter o ícone do carrinho no Windows
             font_bold = ImageFont.truetype("arialbd.ttf", 26)
             font_norm = ImageFont.truetype("arial.ttf", 20)
         except:
@@ -114,8 +106,8 @@ class ListaComprasPro:
             
         d.line((40, y_linha, largura-40, y_linha), fill=(0, 0, 0), width=3)
         y = y_linha + 30
-        for item in itens:
-            d.text((45, y), f"[X] {item}", fill=(0, 0, 0), font=font_norm)
+        for item in itens_com_qtd:
+            d.text((45, y), f"[ ] {item}", fill=(0, 0, 0), font=font_norm)
             y += espaco_item
         
         img_byte_arr = io.BytesIO()
@@ -129,30 +121,22 @@ class ListaComprasPro:
         texto_msg += f"*{data_br}*\n\n"
         if motivo_texto:
             texto_msg += f"*MOTIVO:* {str(motivo_texto).upper()}\n\n"
-        texto_msg += "\n".join([f"[X] {item}" for item in sorted(lista_final, key=remover_acentos)])
+        texto_msg += "\n".join([f"[ ] {item}" for item in sorted(lista_final, key=remover_acentos)])
         texto_msg += "\n\n_by ®rvrs_"
         return f"https://wa.me/?text={urllib.parse.quote(texto_msg)}"
 
-# --- Interface ---
-# Você pode usar um Emoji ou o caminho do seu arquivo de imagem
-st.set_page_config(
-    page_title="Lista Compras ®rvrs", 
-    page_icon="🛒", # Aqui você pode colocar um emoji ou "favicon.png"
-    layout="wide", 
-    initial_sidebar_state="collapsed"
-)
-
+# --- Estilo Visual ---
 st.markdown("""<style>
     .main-title { font-family: 'Arial Black'; text-align: center; border-bottom: 3px solid #000; text-transform: uppercase; font-size: 30px; }
-    .stMarkdown h3 { background-color: #000; color: #fff !important; padding: 10px; border-radius: 5px; }
+    .stMarkdown h3 { background-color: #000; color: #fff !important; padding: 10px; border-radius: 5px; margin-top: 10px; }
     </style>""", unsafe_allow_html=True)
 
 app = ListaComprasPro()
 st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_html=True)
 
-total_estimado = 0.0
-itens_marcados_nomes = []
+itens_marcados_com_qtd = []
 
+# --- Barra Lateral (Configurações) ---
 with st.sidebar:
     st.header("📋 CONFIGURAÇÃO")
     motivo_input = st.text_input("Motivo da Compra:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
@@ -168,23 +152,29 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
-# --- Processamento ---
+# --- Processamento dos Itens ---
 for k, v in st.session_state.items():
     if k.startswith("check_") and v:
         partes = k.split("_")
         if len(partes) >= 2:
             nome_item = "_".join(partes[1:-1])
-            if nome_item not in itens_marcados_nomes:
-                itens_marcados_nomes.append(nome_item)
+            cat_item = partes[-1]
+            # Recupera a quantidade (padrão 1)
+            qtd = st.session_state.get(f"q_{nome_item}_{cat_item}", 1)
+            item_formatado = f"{nome_item} (x{qtd})" if qtd > 1 else nome_item
+            if item_formatado not in itens_marcados_com_qtd:
+                itens_marcados_com_qtd.append(item_formatado)
 
+# --- Exibição Principal ---
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
-    if itens_marcados_nomes:
-        for item in sorted(itens_marcados_nomes, key=remover_acentos):
-            st.write(f"### [X] {item}")
+    if itens_marcados_com_qtd:
+        for item in sorted(itens_marcados_com_qtd, key=remover_acentos):
+            st.write(f"### [ ] {item}")
     else:
         st.info("Nenhum item selecionado.")
 else:
+    # Layout em 3 colunas para as categorias
     col1, col2, col3 = st.columns(3)
     categorias_validas = [(k, v) for k, v in st.session_state.categorias.items() if v or k == "OUTROS"]
     
@@ -193,37 +183,28 @@ else:
         with col_atual:
             st.subheader(str(cat_nome))
             for p in produtos:
-              #  c1, c2, c3 = st.columns([2, 0.8, 1])
-              #  with c1:
-              #      marcado = st.checkbox(p, key=f"check_{p}_{cat_nome}")
-              #  if marcado:
-              #      with c2:
-              #          q = st.number_input("Q", 1, 100, 1, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
-              #      with c3:
-              #          pr = st.number_input("R", 0.0, 1000.0, 0.0, 0.5, key=f"p_{p}_{cat_nome}", label_visibility="collapsed")
-              #      total_estimado += (q * pr)
+                # Cria duas sub-colunas: uma para o checkbox (nome) e uma menor para quantidade
+                c1, c2 = st.columns([3, 1]) 
+                with c1:
+                    marcado = st.checkbox(p, key=f"check_{p}_{cat_nome}")
+                if marcado:
+                    with c2:
+                        st.number_input("Q", 1, 100, 1, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
 
+# --- Ações de Exportação na Sidebar ---
 with st.sidebar:
-   # st.divider()
-   # st.metric("💰 TOTAL ESTIMADO", f"R$ {total_estimado:.2f}")
-    if itens_marcados_nomes:
-        url_wa = app.gerar_whatsapp_texto(itens_marcados_nomes, motivo_input)
-        st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">📲 ENVIAR WHATSAPP</div></a>', unsafe_allow_html=True)
-        img_bytes = app.gerar_imagem(sorted(list(set(itens_marcados_nomes)), key=remover_acentos), motivo_input)
+    st.divider()
+    if itens_marcados_com_qtd:
+        url_wa = app.gerar_whatsapp_texto(itens_marcados_com_qtd, motivo_input)
+        st.markdown(f'''
+            <a href="{url_wa}" target="_blank" style="text-decoration:none;">
+                <div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">
+                    📲 ENVIAR WHATSAPP
+                </div>
+            </a>''', unsafe_allow_html=True)
+        
+        img_bytes = app.gerar_imagem(sorted(itens_marcados_com_qtd, key=remover_acentos), motivo_input)
         st.download_button("🖼️ BAIXAR IMAGEM", img_bytes, "lista_compras.png", "image/png", use_container_width=True)
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
