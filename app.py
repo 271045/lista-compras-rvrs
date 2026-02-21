@@ -110,7 +110,13 @@ class ListaComprasPro:
         return f"https://wa.me/?text={urllib.parse.quote(texto_msg)}"
 
 # --- Interface ---
-st.set_page_config(page_title="🛒Lista Compras ®rvrs", layout="wide", initial_sidebar_state="collapsed")
+# Você pode usar um Emoji ou o caminho do seu arquivo de imagem
+st.set_page_config(
+    page_title="Lista Compras ®rvrs", 
+    page_icon="🛒", # Aqui você pode colocar um emoji ou "favicon.png"
+    layout="wide", 
+    initial_sidebar_state="collapsed"
+)
 
 st.markdown("""<style>
     .main-title { font-family: 'Arial Black'; text-align: center; border-bottom: 3px solid #000; text-transform: uppercase; font-size: 30px; }
@@ -184,6 +190,7 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
 
 
 
