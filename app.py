@@ -62,46 +62,56 @@ class ListaComprasPro:
         st.rerun()
 
     def gerar_imagem(self, itens, motivo_texto):
-        largura = 600
-        espaco_item = 40
-        y_cabecalho = 180 if motivo_texto else 130
-        altura_total = y_cabecalho + (len(itens) * espaco_item) + 100
+        # ESCALA SUPER HD (3x mais densidade de pixels)
+        escala = 3
+        largura = 700 * escala
+        item_h = 50 * escala
+        margem = 60 * escala
+        topo = 240 * escala if motivo_texto else 180 * escala
+        altura_total = topo + (len(itens) * item_h) + margem
+        
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
         
         try:
-            # seguisym.ttf costuma ter o ícone do carrinho no Windows
-            font_bold = ImageFont.truetype("arialbd.ttf", 26)
-            font_norm = ImageFont.truetype("arial.ttf", 20)
+            # Fontes em tamanhos grandes para preservar bordas nítidas
+            f_titulo = ImageFont.truetype("arialbd.ttf", 45 * escala)
+            f_data = ImageFont.truetype("arial.ttf", 28 * escala)
+            f_motivo = ImageFont.truetype("arialbd.ttf", 34 * escala)
+            f_itens = ImageFont.truetype("arial.ttf", 32 * escala)
         except:
-            font_bold = ImageFont.load_default()
-            font_norm = ImageFont.load_default()
+            f_titulo = f_data = f_motivo = f_itens = ImageFont.load_default()
         
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
         
-        d.text((40, 35), "Lista de Compras", fill=(0, 0, 0), font=font_bold)
-        d.text((40, 75), f"{data_br}", fill=(100, 100, 100), font=font_norm)
+        # Desenho dos elementos com contraste máximo (Preto 0,0,0)
+        d.text((margem, 50 * escala), "LISTA DE COMPRAS", fill=(0, 0, 0), font=f_titulo)
+        d.text((margem, 110 * escala), f"DATA: {data_br}", fill=(80, 80, 80), font=f_data)
         
-        y_linha = 120
+        y_atual = 160 * escala
         if motivo_texto:
-            d.text((40, 115), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=font_bold)
-            y_linha = 155
+            d.text((margem, y_atual), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=f_motivo)
+            y_atual += 60 * escala
             
-        d.line((40, y_linha, largura-40, y_linha), fill=(0, 0, 0), width=3)
-        y = y_linha + 30
-        for item in itens:
-            d.text((45, y), f"[X] {item}", fill=(0, 0, 0), font=font_norm)
-            y += espaco_item
+        d.line((margem, y_atual, largura - margem, y_atual), fill=(0, 0, 0), width=4 * escala)
         
+        y_itens = y_atual + 50 * escala
+        for item in itens:
+            d.text((margem + 10, y_itens), f"[X] {item}", fill=(0, 0, 0), font=f_itens)
+            y_itens += item_h
+            
+        # Borda de segurança para evitar compressão agressiva das bordas
+        d.rectangle([0, 0, largura-1, altura_total-1], outline=(220, 220, 220), width=2 * escala)
+
         img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format='PNG')
+        img.save(img_byte_arr, format='PNG', optimize=False)
         return img_byte_arr.getvalue()
 
     def gerar_whatsapp_texto(self, lista_final, motivo_texto):
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
-        texto_msg = f"*LISTA DE COMPRAS*\n"
+        texto_msg = f"*--- LISTA DE COMPRAS ---*\n"
         texto_msg += f"*{data_br}*\n\n"
         if motivo_texto:
             texto_msg += f"*MOTIVO:* {str(motivo_texto).upper()}\n\n"
@@ -118,7 +128,7 @@ st.markdown("""<style>
     </style>""", unsafe_allow_html=True)
 
 app = ListaComprasPro()
-st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">Lista de Compras</h1>', unsafe_allow_html=True)
 
 total_estimado = 0.0
 itens_marcados_nomes = []
@@ -127,7 +137,7 @@ with st.sidebar:
     st.header("📋 CONFIGURAÇÃO")
     motivo_input = st.text_input("Motivo da Compra:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
     st.divider()
-    modo_mercado = st.toggle("🛒 MODO MERCADO")
+    modo_mercado = st.toggle("MODO MERCADO")
     if st.button("✨ CRIAR MINHA LISTA", use_container_width=True): app.criar_minha_lista()
     if st.button("🔄 RESTAURAR PADRÃO", use_container_width=True): 
         app.resetar_estoque_padrao()
@@ -138,7 +148,7 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
-# --- Coleta de Itens Marcados (Segura) ---
+# --- Processamento ---
 for k, v in st.session_state.items():
     if k.startswith("check_") and v:
         partes = k.split("_")
@@ -148,28 +158,25 @@ for k, v in st.session_state.items():
                 itens_marcados_nomes.append(nome_item)
 
 if modo_mercado:
-    st.markdown("## 🛒 MODO MERCADO ATIVO")
+    st.markdown("## MODO MERCADO")
     if itens_marcados_nomes:
         for item in sorted(itens_marcados_nomes, key=remover_acentos):
             st.write(f"### [X] {item}")
     else:
         st.info("Nenhum item selecionado.")
 else:
-    # Lógica das Colunas Corrigida
     col1, col2, col3 = st.columns(3)
-    # Filtramos apenas categorias que existem e têm conteúdo
     categorias_validas = [(k, v) for k, v in st.session_state.categorias.items() if v or k == "OUTROS"]
     
     for i, (cat_nome, produtos) in enumerate(categorias_validas):
         col_atual = [col1, col2, col3][i % 3]
         with col_atual:
-            # Garantimos que cat_nome é string para o subheader
             st.subheader(str(cat_nome))
             for p in produtos:
                 c1, c2, c3 = st.columns([2, 0.8, 1])
                 with c1:
-                    is_checked = st.checkbox(p, key=f"check_{p}_{cat_nome}")
-                if is_checked:
+                    marcado = st.checkbox(p, key=f"check_{p}_{cat_nome}")
+                if marcado:
                     with c2:
                         q = st.number_input("Q", 1, 100, 1, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
                     with c3:
@@ -178,13 +185,12 @@ else:
 
 with st.sidebar:
     st.divider()
-    st.metric("💰 TOTAL", f"R$ {total_estimado:.2f}")
+    st.metric("💰 TOTAL ESTIMADO", f"R$ {total_estimado:.2f}")
     if itens_marcados_nomes:
         url_wa = app.gerar_whatsapp_texto(itens_marcados_nomes, motivo_input)
-        st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">📲 WHATSAPP</div></a>', unsafe_allow_html=True)
+        st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">📲 ENVIAR WHATSAPP</div></a>', unsafe_allow_html=True)
         img_bytes = app.gerar_imagem(sorted(list(set(itens_marcados_nomes)), key=remover_acentos), motivo_input)
-        st.download_button("🖼️ IMAGEM", img_bytes, "lista.png", "image/png", use_container_width=True)
+        st.download_button("🖼️ BAIXAR IMAGEM", img_bytes, "lista_compras.png", "image/png", use_container_width=True)
 
 st.markdown("---")
-
-st.markdown("<p style='text-align:center; color:grey;'>2026 🛒 Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:grey;'>2026 Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
