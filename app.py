@@ -60,8 +60,8 @@ class ListaComprasPro:
                 st.session_state.categorias[cat] = []
         st.session_state.reset_trigger += 1
         st.rerun()
-
-   def gerar_imagem(self, itens, motivo_texto):
+        
+    def gerar_imagem(self, itens, motivo_texto):
         # Escala equilibrada para não ativar a compressão do WhatsApp
         largura = 800 
         item_h = 50
@@ -194,5 +194,6 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
 
 
