@@ -9,15 +9,15 @@ import unicodedata
 import io
 
 # 2. Logo após os imports, carregamos a imagem e configuramos a página
-# ATENÇÃO: Use o nome "meu_icone.png" se você seguiu o passo de mudar o nome para fugir da coroa
+# ATENÇÃO: Use o nome "meu-icone.png" se você seguiu o passo de mudar o nome para fugir da coroa
 try:
-    caminho_icone = os.path.join(os.getcwd(), "meu_icone.png")
+    caminho_icone = os.path.join(os.getcwd(), "meu-icone.png")
     img_favicon = Image.open(caminho_icone)
 except:
     img_favicon = "🛒" # Se o arquivo não for achado, usa o emoji
 
 st.set_page_config(
-    page_title="Lista Compras ®rvrs",
+    page_title="🛒Lista Compras ®rvrs",
     page_icon=img_favicon, 
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -214,6 +214,7 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
 
 
 
