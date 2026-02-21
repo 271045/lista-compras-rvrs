@@ -106,7 +106,8 @@ class ListaComprasPro:
         d.line((40, y_linha, largura-40, y_linha), fill=(0, 0, 0), width=3)
         y = y_linha + 30
         for item in itens_lista:
-            d.text((45, y), f"[ ] {item}", fill=(0, 0, 0), font=font_norm)
+            # Imprime [x] Item (Qtd)
+            d.text((45, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
             y += espaco_item
         
         img_byte_arr = io.BytesIO()
@@ -120,7 +121,8 @@ class ListaComprasPro:
         texto_msg += f"*{data_br}*\n\n"
         if motivo_texto:
             texto_msg += f"*MOTIVO:* {str(motivo_texto).upper()}\n\n"
-        texto_msg += "\n".join([f"[ ] {item}" for item in sorted(lista_final, key=remover_acentos)])
+        # Imprime [x] Item (Qtd) no texto do zap
+        texto_msg += "\n".join([f"[x] {item}" for item in sorted(lista_final, key=remover_acentos)])
         texto_msg += "\n\n_by ®rvrs_"
         return f"https://wa.me/?text={urllib.parse.quote(texto_msg)}"
 
@@ -135,7 +137,7 @@ st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_htm
 
 itens_para_exportar = []
 
-# --- Barra Lateral (Configurações e Inputs) ---
+# --- Barra Lateral ---
 with st.sidebar:
     st.header("📋 CONFIGURAÇÃO")
     motivo_input = st.text_input("Motivo da Compra:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
@@ -151,7 +153,7 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
-# --- Lógica de Processamento dos Itens Selecionados ---
+# --- Lógica de Processamento ---
 for k, v in st.session_state.items():
     if k.startswith("check_") and v:
         partes = k.split("_")
@@ -159,21 +161,21 @@ for k, v in st.session_state.items():
             nome_item = "_".join(partes[1:-1])
             cat_item = partes[-1]
             
-            # Recupera a quantidade selecionada no number_input
+            # Pega a quantidade do session_state
             qtd = st.session_state.get(f"q_{nome_item}_{cat_item}", 1)
             
-            # Formata o texto: ex: ARROZ (x2)
-            texto_final = f"{nome_item} (x{qtd})" if qtd > 1 else nome_item
+            # AGORA SEMPRE IMPRIME: Item (Quantidade)
+            texto_final = f"{nome_item} ({qtd})"
             
             if texto_final not in itens_para_exportar:
                 itens_para_exportar.append(texto_final)
 
-# --- Exibição Principal da Lista ---
+# --- Exibição Principal ---
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
     if itens_para_exportar:
         for item in sorted(itens_para_exportar, key=remover_acentos):
-            st.write(f"### [ ] {item}")
+            st.write(f"### [x] {item}")
     else:
         st.info("Nenhum item selecionado.")
 else:
@@ -192,11 +194,10 @@ else:
                     with c_qtd:
                         st.number_input("Q", 1, 100, 1, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
 
-# --- Botões de WhatsApp e Download na Sidebar ---
+# --- Exportação na Sidebar ---
 with st.sidebar:
     st.divider()
     if itens_para_exportar:
-        # Gerar link WhatsApp com quantidades
         url_wa = app.gerar_whatsapp_texto(itens_para_exportar, motivo_input)
         st.markdown(f'''
             <a href="{url_wa}" target="_blank" style="text-decoration:none;">
@@ -205,7 +206,6 @@ with st.sidebar:
                 </div>
             </a>''', unsafe_allow_html=True)
         
-        # Gerar imagem com quantidades
         img_bytes = app.gerar_imagem(sorted(itens_para_exportar, key=remover_acentos), motivo_input)
         st.download_button("🖼️ BAIXAR IMAGEM", img_bytes, "lista_compras.png", "image/png", use_container_width=True)
 
