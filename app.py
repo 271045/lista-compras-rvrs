@@ -1,21 +1,29 @@
 # -*- coding: utf-8 -*-
+# 1. Primeiro todos os imports (o motor do seu app)
 import streamlit as st
 from PIL import Image
-# ... mantenha seus outros imports abaixo destes
+import os
+from datetime import datetime
+import urllib.parse
+import unicodedata
+import io
 
-# Tenta carregar o arquivo que você subiu no GitHub
+# 2. Logo após os imports, carregamos a imagem e configuramos a página
+# ATENÇÃO: Use o nome "meu_icone.png" se você seguiu o passo de mudar o nome para fugir da coroa
 try:
-    img_favicon = Image.open("favicon.png")
+    caminho_icone = os.path.join(os.getcwd(), "meu_icone.png")
+    img_favicon = Image.open(caminho_icone)
 except:
-    img_favicon = "🛒" # Emoji reserva caso o arquivo não seja encontrado
+    img_favicon = "🛒" # Se o arquivo não for achado, usa o emoji
 
-# Configuração da página - DEVE ser o primeiro comando st.
 st.set_page_config(
     page_title="Lista Compras ®rvrs",
-    page_icon=img_favicon,
+    page_icon=img_favicon, 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# 3. O restante do seu código (Classe ListaComprasPro, etc) vem daqui para baixo
 from datetime import datetime
 import urllib.parse
 import unicodedata
@@ -206,6 +214,7 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
 
 
 
