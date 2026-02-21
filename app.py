@@ -62,8 +62,8 @@ class ListaComprasPro:
         st.rerun()
         
     def gerar_imagem(self, itens, motivo_texto):
-        # Escala equilibrada para não ativar a compressão do WhatsApp
-        largura = 800 
+        # Aumentamos o contraste e usamos uma escala segura
+        largura = 800
         item_h = 50
         margem = 60
         topo = 220 if motivo_texto else 160
@@ -72,40 +72,30 @@ class ListaComprasPro:
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
         
-        # Tenta carregar a fonte que você subiu na mesma pasta
+        # Tentamos carregar fontes que existem no Linux do Streamlit
         try:
-            # IMPORTANTE: O arquivo 'arialbd.ttf' deve estar na mesma pasta do app.py no GitHub
+            # Se você subiu o arquivo arialbd.ttf, ele usará este:
             f_titulo = ImageFont.truetype("arialbd.ttf", 45)
-            f_data = ImageFont.truetype("arialbd.ttf", 28)
-            f_motivo = ImageFont.truetype("arialbd.ttf", 34)
             f_itens = ImageFont.truetype("arialbd.ttf", 32)
         except:
-            # Se não encontrar o arquivo, usa a padrão (que fica ruim)
-            f_titulo = f_data = f_motivo = f_itens = ImageFont.load_default()
+            # Caso contrário, o sistema usa a fonte padrão, mas vamos forçar tamanho maior
+            f_titulo = f_itens = ImageFont.load_default()
+
+        data_br = datetime.now().strftime("%d/%m/%Y")
         
-        fuso_br = pytz.timezone('America/Sao_Paulo')
-        data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
-        
-        # Fundo branco com texto PRETO ABSOLUTO
-        d.text((margem, 50), "LISTA DE COMPRAS", fill=(0, 0, 0), font=f_titulo)
-        d.text((margem, 110), f"DATA: {data_br}", fill=(0, 0, 0), font=f_data)
-        
-        y_atual = 160
-        if motivo_texto:
-            d.text((margem, y_atual), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=f_motivo)
-            y_atual += 60
+        # ESCREVENDO O TEXTO DUAS VEZES (Truque para Negrito Caseiro)
+        # Se a fonte for fina, desenhamos ela com 1 pixel de deslocamento para "engrossar"
+        for offset in [(0,0), (1,0), (0,1), (1,1)]:
+            ox, oy = offset
+            d.text((margem + ox, 50 + oy), "LISTA DE COMPRAS", fill=(0, 0, 0), font=f_titulo)
             
-        d.line((margem, y_atual, largura - margem, y_atual), fill=(0, 0, 0), width=5)
-        
-        y_itens = y_atual + 50
-        for item in itens:
-            # Usando uma bolinha preta ou o [X] bem marcado
-            d.text((margem, y_itens), f"● {item}", fill=(0, 0, 0), font=f_itens)
-            y_itens += item_h
+            y_itens = topo
+            for item in itens:
+                d.text((margem + ox, y_itens + oy), f"X  {item}", fill=(0, 0, 0), font=f_itens)
+                y_itens += item_h
             
         img_byte_arr = io.BytesIO()
-        # Salvar como PNG sem compressão nenhuma
-        img.save(img_byte_arr, format='PNG', compress_level=0)
+        img.save(img_byte_arr, format='PNG')
         return img_byte_arr.getvalue()
 
     def gerar_whatsapp_texto(self, lista_final, motivo_texto):
@@ -194,6 +184,7 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
 
 
 
