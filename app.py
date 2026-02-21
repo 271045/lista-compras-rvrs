@@ -193,19 +193,19 @@ else:
         with col_atual:
             st.subheader(str(cat_nome))
             for p in produtos:
-                c1, c2, c3 = st.columns([2, 0.8, 1])
-                with c1:
-                    marcado = st.checkbox(p, key=f"check_{p}_{cat_nome}")
-                if marcado:
-                    with c2:
-                        q = st.number_input("Q", 1, 100, 1, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
-                    with c3:
-                        pr = st.number_input("R", 0.0, 1000.0, 0.0, 0.5, key=f"p_{p}_{cat_nome}", label_visibility="collapsed")
-                    total_estimado += (q * pr)
+              #  c1, c2, c3 = st.columns([2, 0.8, 1])
+              #  with c1:
+              #      marcado = st.checkbox(p, key=f"check_{p}_{cat_nome}")
+              #  if marcado:
+              #      with c2:
+              #          q = st.number_input("Q", 1, 100, 1, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
+              #      with c3:
+              #          pr = st.number_input("R", 0.0, 1000.0, 0.0, 0.5, key=f"p_{p}_{cat_nome}", label_visibility="collapsed")
+              #      total_estimado += (q * pr)
 
 with st.sidebar:
-    st.divider()
-    st.metric("💰 TOTAL ESTIMADO", f"R$ {total_estimado:.2f}")
+   # st.divider()
+   # st.metric("💰 TOTAL ESTIMADO", f"R$ {total_estimado:.2f}")
     if itens_marcados_nomes:
         url_wa = app.gerar_whatsapp_texto(itens_marcados_nomes, motivo_input)
         st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">📲 ENVIAR WHATSAPP</div></a>', unsafe_allow_html=True)
@@ -214,6 +214,7 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
 
 
 
