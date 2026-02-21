@@ -61,54 +61,51 @@ class ListaComprasPro:
         st.session_state.reset_trigger += 1
         st.rerun()
 
-    def gerar_imagem(self, itens, motivo_texto):
-        # Tamanho ideal para Mobile (Não é gigante, é nítido)
-        largura = 720 
-        item_h = 45
-        margem = 50
-        topo = 200 if motivo_texto else 150
+   def gerar_imagem(self, itens, motivo_texto):
+        # Escala equilibrada para não ativar a compressão do WhatsApp
+        largura = 800 
+        item_h = 50
+        margem = 60
+        topo = 220 if motivo_texto else 160
         altura_total = topo + (len(itens) * item_h) + margem
         
-        # Fundo levemente cinza evita o efeito "fantasma" do WhatsApp
-        img = Image.new('RGB', (largura, altura_total), color=(245, 245, 245))
+        img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
         
+        # Tenta carregar a fonte que você subiu na mesma pasta
         try:
-            # Usamos negrito (arialbd) para tudo ser mais "grosso" e legível
-            f_titulo = ImageFont.truetype("arialbd.ttf", 38)
-            f_data = ImageFont.truetype("arialbd.ttf", 24)
-            f_motivo = ImageFont.truetype("arialbd.ttf", 28)
-            f_itens = ImageFont.truetype("arialbd.ttf", 26)
+            # IMPORTANTE: O arquivo 'arialbd.ttf' deve estar na mesma pasta do app.py no GitHub
+            f_titulo = ImageFont.truetype("arialbd.ttf", 45)
+            f_data = ImageFont.truetype("arialbd.ttf", 28)
+            f_motivo = ImageFont.truetype("arialbd.ttf", 34)
+            f_itens = ImageFont.truetype("arialbd.ttf", 32)
         except:
+            # Se não encontrar o arquivo, usa a padrão (que fica ruim)
             f_titulo = f_data = f_motivo = f_itens = ImageFont.load_default()
         
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
         
-        # Texto Preto Puro (0,0,0) sobre fundo cinza claro = Nitidez máxima
-        d.text((margem, 40), "LISTA DE COMPRAS", fill=(0, 0, 0), font=f_titulo)
-        d.text((margem, 90), f"DATA: {data_br}", fill=(60, 60, 60), font=f_data)
+        # Fundo branco com texto PRETO ABSOLUTO
+        d.text((margem, 50), "LISTA DE COMPRAS", fill=(0, 0, 0), font=f_titulo)
+        d.text((margem, 110), f"DATA: {data_br}", fill=(0, 0, 0), font=f_data)
         
-        y_atual = 140
+        y_atual = 160
         if motivo_texto:
             d.text((margem, y_atual), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=f_motivo)
-            y_atual += 50
+            y_atual += 60
             
-        # Linha separadora bem visível
-        d.line((margem, y_atual, largura - margem, y_atual), fill=(0, 0, 0), width=3)
+        d.line((margem, y_atual, largura - margem, y_atual), fill=(0, 0, 0), width=5)
         
-        y_itens = y_atual + 30
+        y_itens = y_atual + 50
         for item in itens:
-            # Texto em negrito para não sumir na compressão
-            d.text((margem + 10, y_itens), f"[X] {item}", fill=(0, 0, 0), font=f_itens)
+            # Usando uma bolinha preta ou o [X] bem marcado
+            d.text((margem, y_itens), f"● {item}", fill=(0, 0, 0), font=f_itens)
             y_itens += item_h
             
-        # Borda externa para enquadramento
-        d.rectangle([0, 0, largura-1, altura_total-1], outline=(150, 150, 150), width=2)
-
         img_byte_arr = io.BytesIO()
-        # Salvar como PNG Otimizado
-        img.save(img_byte_arr, format='PNG', optimize=True)
+        # Salvar como PNG sem compressão nenhuma
+        img.save(img_byte_arr, format='PNG', compress_level=0)
         return img_byte_arr.getvalue()
 
     def gerar_whatsapp_texto(self, lista_final, motivo_texto):
@@ -197,4 +194,5 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
 
