@@ -15,7 +15,7 @@ except ImportError:
 # 1. Configuração da Página
 try:
     # Tenta carregar o favicon personalizado
-    caminho_icone = os.path.join(os.getcwd(), "favicon.png")
+    caminho_icone = os.path.join(os.getcwd(), "meu-icone.png")
     img_favicon = Image.open(caminho_icone)
 except:
     img_favicon = "🛒"
