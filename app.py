@@ -127,7 +127,7 @@ with st.sidebar:
     st.header("📋 CONFIGURAÇÃO")
     motivo_input = st.text_input("Motivo da Compra:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
     st.divider()
-    modo_mercado = st.toggle("MODO MERCADO")
+    modo_mercado = st.toggle("## 🛒 MODO MERCADO ATIVO")
     if st.button("✨ CRIAR MINHA LISTA", use_container_width=True): app.criar_minha_lista()
     if st.button("🔄 RESTAURAR PADRÃO", use_container_width=True): 
         app.resetar_estoque_padrao()
@@ -148,7 +148,7 @@ for k, v in st.session_state.items():
                 itens_marcados_nomes.append(nome_item)
 
 if modo_mercado:
-    st.markdown("## MODO MERCADO")
+    st.markdown("## 🛒 MODO MERCADO")
     if itens_marcados_nomes:
         for item in sorted(itens_marcados_nomes, key=remover_acentos):
             st.write(f"### [X] {item}")
@@ -184,6 +184,7 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
 
 
 
