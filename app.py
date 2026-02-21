@@ -62,40 +62,52 @@ class ListaComprasPro:
         st.rerun()
         
     def gerar_imagem(self, itens, motivo_texto):
-        # Aumentamos o contraste e usamos uma escala segura
-        largura = 800
-        item_h = 50
-        margem = 60
-        topo = 220 if motivo_texto else 160
+        # Proporção de Alta Performance (1080p)
+        largura = 1080
+        margem = 80
+        item_h = 70 # Mais espaço entre linhas para evitar borrão
+        
+        topo = 300 if motivo_texto else 220
         altura_total = topo + (len(itens) * item_h) + margem
         
-        img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
+        # Fundo em Azul Escuro Profundo (Melhora 100% a nitidez no WhatsApp)
+        cor_fundo = (10, 25, 45) 
+        img = Image.new('RGB', (largura, altura_total), color=cor_fundo)
         d = ImageDraw.Draw(img)
         
-        # Tentamos carregar fontes que existem no Linux do Streamlit
         try:
-            # Se você subiu o arquivo arialbd.ttf, ele usará este:
-            f_titulo = ImageFont.truetype("arialbd.ttf", 45)
-            f_itens = ImageFont.truetype("arialbd.ttf", 32)
+            # Fontes grandes e limpas
+            f_titulo = ImageFont.truetype("arialbd.ttf", 60)
+            f_itens = ImageFont.truetype("arial.ttf", 45)
         except:
-            # Caso contrário, o sistema usa a fonte padrão, mas vamos forçar tamanho maior
             f_titulo = f_itens = ImageFont.load_default()
 
         data_br = datetime.now().strftime("%d/%m/%Y")
         
-        # ESCREVENDO O TEXTO DUAS VEZES (Truque para Negrito Caseiro)
-        # Se a fonte for fina, desenhamos ela com 1 pixel de deslocamento para "engrossar"
-        for offset in [(0,0), (1,0), (0,1), (1,1)]:
-            ox, oy = offset
-            d.text((margem + ox, 50 + oy), "LISTA DE COMPRAS", fill=(0, 0, 0), font=f_titulo)
+        # Desenho do Cabeçalho
+        d.text((margem, 60), "LISTA DE COMPRAS", fill=(255, 255, 255), font=f_titulo)
+        d.text((margem, 140), f"DATA: {data_br}", fill=(180, 180, 180), font=f_itens)
+        
+        y_linha = 200
+        if motivo_texto:
+            d.text((margem, 200), str(motivo_texto).upper(), fill=(0, 200, 255), font=f_itens)
+            y_linha = 260
             
-            y_itens = topo
-            for item in itens:
-                d.text((margem + ox, y_itens + oy), f"X  {item}", fill=(0, 0, 0), font=f_itens)
-                y_itens += item_h
+        # Linha Neon para separar
+        d.line((margem, y_linha, largura - margem, y_linha), fill=(0, 200, 255), width=3)
+        
+        # Itens da Lista
+        y_itens = y_linha + 50
+        for item in itens:
+            # Quadrado indicador de check (mais nítido que texto)
+            d.rectangle([margem, y_itens + 10, margem + 30, y_itens + 40], outline=(0, 200, 255), width=3)
+            # Texto em Branco Puro
+            d.text((margem + 60, y_itens), f"{item}", fill=(255, 255, 255), font=f_itens)
+            y_itens += item_h
             
         img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format='PNG')
+        # Salva como PNG de alta qualidade
+        img.save(img_byte_arr, format='PNG', optimize=True)
         return img_byte_arr.getvalue()
 
     def gerar_whatsapp_texto(self, lista_final, motivo_texto):
@@ -184,6 +196,7 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
 
 
 
