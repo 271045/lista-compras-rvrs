@@ -6,6 +6,7 @@ from datetime import datetime
 import urllib.parse
 import unicodedata
 import io
+import re
 
 try:
     import pytz
@@ -31,6 +32,15 @@ def remover_acentos(texto):
     if not texto: return ""
     return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
                   if unicodedata.category(c) != 'Mn')
+
+def formatar_nome_arquivo(texto):
+    """Transforma o motivo em um nome de arquivo seguro."""
+    if not texto:
+        return "lista-compras"
+    # Remove acentos, transforma em minúsculas e remove caracteres especiais
+    texto = remover_acentos(texto).lower()
+    texto = re.sub(r'[^a-z0-9]', '-', texto) # Substitui espaços/especiais por hífen
+    return texto
 
 class ListaComprasPro:
     def __init__(self):
@@ -106,7 +116,6 @@ class ListaComprasPro:
         d.line((40, y_linha, largura-40, y_linha), fill=(0, 0, 0), width=3)
         y = y_linha + 30
         for item in itens_lista:
-            # Imprime [x] Item (Qtd)
             d.text((45, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
             y += espaco_item
         
@@ -121,7 +130,6 @@ class ListaComprasPro:
         texto_msg += f"*{data_br}*\n\n"
         if motivo_texto:
             texto_msg += f"*MOTIVO:* {str(motivo_texto).upper()}\n\n"
-        # Imprime [x] Item (Qtd) no texto do zap
         texto_msg += "\n".join([f"[x] {item}" for item in sorted(lista_final, key=remover_acentos)])
         texto_msg += "\n\n_by ®rvrs_"
         return f"https://wa.me/?text={urllib.parse.quote(texto_msg)}"
@@ -160,13 +168,8 @@ for k, v in st.session_state.items():
         if len(partes) >= 2:
             nome_item = "_".join(partes[1:-1])
             cat_item = partes[-1]
-            
-            # Pega a quantidade do session_state
             qtd = st.session_state.get(f"q_{nome_item}_{cat_item}", 1)
-            
-            # AGORA SEMPRE IMPRIME: Item (Quantidade)
             texto_final = f"{nome_item} ({qtd})"
-            
             if texto_final not in itens_para_exportar:
                 itens_para_exportar.append(texto_final)
 
@@ -206,8 +209,16 @@ with st.sidebar:
                 </div>
             </a>''', unsafe_allow_html=True)
         
+        # LOGICA DO NOME DO ARQUIVO DINÂMICO
+        nome_final_arquivo = formatar_nome_arquivo(motivo_input)
         img_bytes = app.gerar_imagem(sorted(itens_para_exportar, key=remover_acentos), motivo_input)
-        st.download_button("🖼️ BAIXAR IMAGEM", img_bytes, "lista_compras.png", "image/png", use_container_width=True)
+        st.download_button(
+            label="🖼️ BAIXAR IMAGEM", 
+            data=img_bytes, 
+            file_name=f"{nome_final_arquivo}.png", 
+            mime="image/png", 
+            use_container_width=True
+        )
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
