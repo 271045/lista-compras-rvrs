@@ -1,5 +1,21 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
+from PIL import Image
+# ... mantenha seus outros imports abaixo destes
+
+# Tenta carregar o arquivo que você subiu no GitHub
+try:
+    img_favicon = Image.open("favicon.png")
+except:
+    img_favicon = "🛒" # Emoji reserva caso o arquivo não seja encontrado
+
+# Configuração da página - DEVE ser o primeiro comando st.
+st.set_page_config(
+    page_title="Lista Compras ®rvrs",
+    page_icon=img_favicon,
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 from datetime import datetime
 import urllib.parse
 import unicodedata
@@ -190,6 +206,7 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
 
 
 
