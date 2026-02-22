@@ -72,9 +72,7 @@ class ListaComprasPro:
             st.rerun()
 
     def limpar_tudo(self):
-        # Limpa o dicionário principal de itens marcados
         st.session_state.selecionados = {}
-        # Reseta os widgets forçando a mudança da chave de reset
         st.session_state.reset_trigger += 1
         st.session_state.busca_key += 1
         st.rerun()
@@ -88,49 +86,52 @@ class ListaComprasPro:
         st.rerun()
         
     def gerar_imagem(self, itens_lista, motivo_texto):
-        largura = 550
-        espaco_item = 35
-        y_cabecalho = 150 if motivo_texto else 100
-        altura_total = max(400, y_cabecalho + (len(itens_lista) * espaco_item) + 120)
+        # Aumentamos a largura para a imagem ficar mais imponente
+        largura = 600
+        espaco_item = 45
+        y_cabecalho = 180 if motivo_texto else 130
+        altura_total = max(450, y_cabecalho + (len(itens_lista) * espaco_item) + 120)
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
 
+        # Caminhos de fontes comuns no Linux (GitHub Codespaces / Streamlit Cloud)
+        caminhos_bold = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
+        caminhos_norm = ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
+
+        # Busca a melhor fonte disponível ou usa a padrão do sistema em tamanho grande
         font_bold = None
+        for f in caminhos_bold:
+            if os.path.exists(f):
+                font_bold = ImageFont.truetype(f, 32)
+                break
+        if not font_bold: font_bold = ImageFont.load_default(size=32)
+
         font_norm = None
-        c_bold = ["arialbd.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]
-        c_norm = ["arial.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"]
-
-        for f in c_bold:
-            try:
-                if os.path.exists(f):
-                    font_bold = ImageFont.truetype(f, 26)
-                    break
-            except: continue
-        for f in c_norm:
-            try:
-                if os.path.exists(f):
-                    font_norm = ImageFont.truetype(f, 20)
-                    break
-            except: continue
-
-        if not font_bold: font_bold = ImageFont.load_default()
-        if not font_norm: font_norm = ImageFont.load_default()
+        for f in caminhos_norm:
+            if os.path.exists(f):
+                font_norm = ImageFont.truetype(f, 24)
+                break
+        if not font_norm: font_norm = ImageFont.load_default(size=24)
         
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
-        d.text((30, 30), "LISTA DE COMPRAS", fill=(0, 0, 0), font=font_bold)
-        d.text((30, 65), f"{data_br}", fill=(100, 100, 100), font=font_norm)
         
-        y_linha = 100
+        # Desenho
+        d.text((40, 40), "LISTA DE COMPRAS", fill=(0, 0, 0), font=font_bold)
+        d.text((40, 85), f"Data: {data_br}", fill=(100, 100, 100), font=font_norm)
+        
+        y_linha = 130
         if motivo_texto:
-            d.text((30, 95), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=font_bold)
-            y_linha = 135
-        d.line((30, y_linha, largura-30, y_linha), fill=(0, 0, 0), width=2)
-        y = y_linha + 25
+            d.text((40, 125), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=font_bold)
+            y_linha = 175
+            
+        d.line((40, y_linha, largura-40, y_linha), fill=(0, 0, 0), width=3)
+        y = y_linha + 30
         for item in itens_lista:
-            d.text((40, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
+            d.text((50, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
             y += espaco_item
-        d.text((30, y + 20), "by ®rvrs", fill=(150, 150, 150), font=font_norm)
+        
+        d.text((40, y + 30), "by ®rvrs", fill=(170, 170, 170), font=font_norm)
         
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG')
@@ -155,10 +156,10 @@ st.markdown("""<style>
 app = ListaComprasPro()
 st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_html=True)
 
-# --- BLOCO DE BUSCA ---
+# --- BUSCA ---
 c_busca, c_limpa = st.columns([4, 1])
 with c_busca:
-    busca_input = st.text_input("🔍 Pesquisar...", placeholder="Digite o item...", key=f"input_busca_{st.session_state.busca_key}", label_visibility="collapsed")
+    busca_input = st.text_input("🔍 Pesquisar...", placeholder="Digite para filtrar...", key=f"input_busca_{st.session_state.busca_key}", label_visibility="collapsed")
 with c_limpa:
     if st.button("❌ Limpar", use_container_width=True):
         st.session_state.busca_key += 1
@@ -166,7 +167,7 @@ with c_limpa:
 
 busca_termo = normalizar_texto(busca_input)
 
-# --- Barra Lateral ---
+# --- Sidebar ---
 with st.sidebar:
     st.header("📋 CONFIGURAÇÃO")
     motivo_input = st.text_input("Motivo da Compra:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
@@ -182,15 +183,17 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
+# --- Processamento ---
+itens_para_exportar = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
+
 # --- Exibição ---
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
-    itens_formatados = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
-    filtrados = [i for i in itens_formatados if busca_termo in normalizar_texto(i)]
-    if filtrados:
+    if itens_para_exportar:
+        filtrados = [i for i in itens_para_exportar if busca_termo in normalizar_texto(i)]
         for item in sorted(filtrados, key=normalizar_texto):
             st.write(f"### [x] {item}")
-    else: st.info("Nenhum item selecionado ou encontrado.")
+    else: st.info("Nenhum item selecionado.")
 else:
     col1, col2, col3 = st.columns(3)
     for i, (cat_nome, produtos) in enumerate(st.session_state.categorias.items()):
@@ -202,11 +205,9 @@ else:
                     c1, c2 = st.columns([3, 1])
                     foi_sel = p in st.session_state.selecionados
                     qtd_ini = st.session_state.selecionados[p]['qtd'] if foi_sel else 1
-                    
-                    # A chave (key) do checkbox agora inclui o reset_trigger para garantir o reset visual
                     with c1:
+                        # Chave única baseada no produto, categoria e reset_trigger para resetar visualmente
                         marcado = st.checkbox(p, value=foi_sel, key=f"chk_{p}_{cat_nome}_{st.session_state.reset_trigger}")
-                    
                     if marcado:
                         with c2:
                             qtd = st.number_input("Q", 1, 100, qtd_ini, key=f"q_{p}_{cat_nome}_{st.session_state.reset_trigger}", label_visibility="collapsed")
@@ -214,9 +215,7 @@ else:
                     else:
                         if p in st.session_state.selecionados: del st.session_state.selecionados[p]
 
-# --- Preparação e Exportação ---
-itens_para_exportar = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
-
+# --- Exportação ---
 with st.sidebar:
     st.divider()
     if itens_para_exportar:
