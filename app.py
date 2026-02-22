@@ -13,7 +13,7 @@ try:
 except ImportError:
     pass
 
-# 1. Configuração da Página e Ícone
+# 1. Configuração da Página
 try:
     caminho_icone = os.path.join(os.getcwd(), "favicon.png")
     img_favicon = Image.open(caminho_icone)
@@ -27,9 +27,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Funções de Suporte (CORRIGIDAS PARA O FILTRO)
+# 2. Funções de Suporte
 def normalizar_texto(texto):
-    """Remove acentos, espaços extras e deixa em minúsculo para busca precisa."""
     if not texto: return ""
     texto = str(texto).strip().lower()
     return ''.join(c for c in unicodedata.normalize('NFD', texto)
@@ -89,7 +88,7 @@ class ListaComprasPro:
         largura = 550
         espaco_item = 35
         y_cabecalho = 150 if motivo_texto else 100
-        altura_total = y_cabecalho + (len(itens_lista) * espaco_item) + 80
+        altura_total = max(400, y_cabecalho + (len(itens_lista) * espaco_item) + 120)
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
         try:
@@ -118,7 +117,7 @@ class ListaComprasPro:
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG')
         return img_byte_arr.getvalue()
-   
+
     def gerar_whatsapp_texto(self, lista_final, motivo_texto):
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
@@ -140,7 +139,10 @@ st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_htm
 
 # --- Variáveis de Processamento ---
 itens_para_exportar = []
-busca_termo = normalizar_texto(st.text_input("🔍 Pesquisar item na lista...", placeholder="Ex: arroz"))
+
+# BARRA DE BUSCA (Ajustada para ser o mais reativa possível)
+busca_input = st.text_input("🔍 Pesquisar item na lista...", placeholder="Digite para filtrar...")
+busca_termo = normalizar_texto(busca_input)
 
 # --- Barra Lateral ---
 with st.sidebar:
@@ -158,7 +160,7 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
-# --- Lógica de Processamento (Coleta TODOS os marcados independente do filtro) ---
+# --- Lógica de Processamento Global ---
 for k, v in st.session_state.items():
     if k.startswith("check_") and v:
         partes = k.split("_")
@@ -174,7 +176,6 @@ for k, v in st.session_state.items():
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
     if itens_para_exportar:
-        # Filtra na exibição se houver busca
         filtrados = [i for i in itens_para_exportar if busca_termo in normalizar_texto(i)]
         for item in sorted(filtrados, key=normalizar_texto):
             st.write(f"### [x] {item}")
@@ -185,9 +186,7 @@ else:
     categorias_ativas = list(st.session_state.categorias.items())
     
     for i, (cat_nome, produtos) in enumerate(categorias_ativas):
-        # Filtra os produtos da categoria
         produtos_f = [p for p in produtos if busca_termo in normalizar_texto(p)]
-        
         if produtos_f:
             with [col1, col2, col3][i % 3]:
                 st.subheader(str(cat_nome))
