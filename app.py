@@ -34,12 +34,10 @@ def remover_acentos(texto):
                   if unicodedata.category(c) != 'Mn')
 
 def formatar_nome_arquivo(texto):
-    """Transforma o motivo em um nome de arquivo seguro."""
     if not texto:
         return "lista-compras"
-    # Remove acentos, transforma em minúsculas e remove caracteres especiais
     texto = remover_acentos(texto).lower()
-    texto = re.sub(r'[^a-z0-9]', '-', texto) # Substitui espaços/especiais por hífen
+    texto = re.sub(r'[^a-z0-9]', '-', texto) 
     return texto
 
 class ListaComprasPro:
@@ -163,7 +161,7 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
-# --- Lógica de Processamento ---
+# --- Lógica de Processamento (Sempre processa antes de exibir) ---
 for k, v in st.session_state.items():
     if k.startswith("check_") and v:
         partes = k.split("_")
@@ -175,11 +173,16 @@ for k, v in st.session_state.items():
             if texto_final not in itens_para_exportar:
                 itens_para_exportar.append(texto_final)
 
+# --- Barra de Pesquisa ---
+busca = st.text_input("🔍 Pesquisar item na lista...", placeholder="Digite o nome do produto aqui...").upper()
+
 # --- Exibição Principal ---
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
     if itens_para_exportar:
-        for item in sorted(itens_para_exportar, key=remover_acentos):
+        # Filtra também no modo mercado
+        itens_filtrados = [i for i in itens_para_exportar if busca in i]
+        for item in sorted(itens_filtrados, key=remover_acentos):
             st.write(f"### [x] {item}")
     else:
         st.info("Nenhum item selecionado.")
@@ -188,16 +191,21 @@ else:
     categorias_ativas = [(k, v) for k, v in st.session_state.categorias.items() if v or k == "OUTROS"]
     
     for i, (cat_nome, produtos) in enumerate(categorias_ativas):
-        col_atual = [col1, col2, col3][i % 3]
-        with col_atual:
-            st.subheader(str(cat_nome))
-            for p in produtos:
-                c_check, c_qtd = st.columns([3, 1])
-                with c_check:
-                    marcado = st.checkbox(p, key=f"check_{p}_{cat_nome}")
-                if marcado:
-                    with c_qtd:
-                        st.number_input("Q", 1, 100, 1, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
+        # Filtra os produtos da categoria baseada na busca
+        produtos_filtrados = [p for p in produtos if busca in remover_acentos(p).upper()]
+        
+        # Só exibe a categoria se houver produtos que batem com a busca
+        if produtos_filtrados:
+            col_atual = [col1, col2, col3][i % 3]
+            with col_atual:
+                st.subheader(str(cat_nome))
+                for p in produtos_filtrados:
+                    c_check, c_qtd = st.columns([3, 1])
+                    with c_check:
+                        marcado = st.checkbox(p, key=f"check_{p}_{cat_nome}")
+                    if marcado:
+                        with c_qtd:
+                            st.number_input("Q", 1, 100, 1, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
 
 # --- Exportação na Sidebar ---
 with st.sidebar:
@@ -211,7 +219,6 @@ with st.sidebar:
                 </div>
             </a>''', unsafe_allow_html=True)
         
-        # LOGICA DO NOME DO ARQUIVO DINÂMICO
         nome_final_arquivo = formatar_nome_arquivo(motivo_input)
         img_bytes = app.gerar_imagem(sorted(itens_para_exportar, key=remover_acentos), motivo_input)
         st.download_button(
@@ -224,4 +231,3 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
-
