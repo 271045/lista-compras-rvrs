@@ -105,7 +105,7 @@ class ListaComprasPro:
         img.save(img_byte_arr, format='PNG')
         return img_byte_arr.getvalue()
 
-# --- Interface Estilo ---
+# --- Interface ---
 st.markdown("""<style>
     .main-title { font-family: 'Arial Black'; text-align: center; border-bottom: 3px solid #000; text-transform: uppercase; font-size: 30px; }
     .stMarkdown h3 { background-color: #000; color: #fff !important; padding: 10px; border-radius: 5px; margin-top: 10px; }
@@ -114,7 +114,7 @@ st.markdown("""<style>
 app = ListaComprasPro()
 st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_html=True)
 
-# --- BLOCO DE BUSCA ---
+# --- BUSCA ---
 c_busca, c_limpa = st.columns([4, 1])
 with c_busca:
     busca_input = st.text_input("🔍 Pesquisar...", key=f"input_busca_{st.session_state.busca_key}", label_visibility="collapsed", placeholder="Pesquisar item...")
@@ -127,31 +127,43 @@ busca_termo = normalizar_texto(busca_input)
 
 # --- Sidebar ---
 with st.sidebar:
-    st.header("💾 GERENCIAR LISTAS")
-    nome_salvar = st.text_input("Nome da Lista:", placeholder="Ex: Compra Mensal")
-    if st.button("📥 SALVAR LISTA ATUAL", use_container_width=True):
+    st.header("💾 ARQUIVOS")
+    
+    # SALVAR / EDITAR
+    nome_salvar = st.text_input("Nome (Salvar/Editar):", placeholder="Ex: Churrasco")
+    if st.button("📥 SALVAR ATUAL / ATUALIZAR", use_container_width=True):
         if nome_salvar:
             caminho = os.path.join(DIRETORIO_LISTAS, formatar_nome_arquivo(nome_salvar) + ".json")
             with open(caminho, 'w', encoding='utf-8') as f:
                 json.dump(st.session_state.selecionados, f, ensure_ascii=False, indent=4)
-            st.success("Lista salva!")
+            st.success(f"Lista '{nome_salvar}' guardada!")
+            st.rerun()
         else:
-            st.warning("Dê um nome à lista!")
+            st.warning("Escreva um nome!")
+
+    st.divider()
     
-    arquivos_salvos = [f for f in os.listdir(DIRETORIO_LISTAS) if f.endswith('.json')]
+    # CARREGAR / EXCLUIR
+    arquivos_salvos = sorted([f for f in os.listdir(DIRETORIO_LISTAS) if f.endswith('.json')])
     if arquivos_salvos:
-        st.divider()
-        lista_escolhida = st.selectbox("Recuperar lista:", ["Selecionar..."] + arquivos_salvos)
+        lista_escolhida = st.selectbox("Listas guardadas:", ["Selecionar..."] + arquivos_salvos)
         if lista_escolhida != "Selecionar...":
-            if st.button("📂 CARREGAR", use_container_width=True):
-                caminho = os.path.join(DIRETORIO_LISTAS, lista_escolhida)
-                with open(caminho, 'r', encoding='utf-8') as f:
-                    st.session_state.selecionados = json.load(f)
-                st.session_state.reset_trigger += 1
-                st.rerun()
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("📂 CARREGAR", use_container_width=True):
+                    caminho = os.path.join(DIRETORIO_LISTAS, lista_escolhida)
+                    with open(caminho, 'r', encoding='utf-8') as f:
+                        st.session_state.selecionados = json.load(f)
+                    st.session_state.reset_trigger += 1
+                    st.rerun()
+            with c2:
+                if st.button("🗑️ EXCLUIR", use_container_width=True):
+                    os.remove(os.path.join(DIRETORIO_LISTAS, lista_escolhida))
+                    st.warning("Lista apagada!")
+                    st.rerun()
     
     st.divider()
-    st.header("📋 CONFIGURAÇÃO")
+    st.header("📋 OPÇÕES")
     motivo_input = st.text_input("Motivo:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
     modo_mercado = st.toggle("## 🛒 MODO MERCADO")
     if st.button("🗑️ DESMARCAR TUDO", use_container_width=True): app.limpar_tudo()
