@@ -36,7 +36,7 @@ def normalizar_texto(texto):
                   if unicodedata.category(c) != 'Mn')
 
 def formatar_nome_arquivo(texto):
-    """Transforma o motivo em um nome de arquivo seguro para download."""
+    """Transforma o motivo em um nome de arquivo seguro."""
     if not texto: return "lista-compras"
     texto = normalizar_texto(texto)
     return re.sub(r'[^a-z0-9]', '-', texto)
@@ -95,16 +95,30 @@ class ListaComprasPro:
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
 
-        # --- Bloco de Fontes Inteligentes (Windows/Linux) ---
-        caminhos_bold = ["arialbd.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
-        caminhos_norm = ["arial.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
+        # Lógica de Fontes Segura
+        font_bold = None
+        font_norm = None
+        c_bold = ["arialbd.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]
+        c_norm = ["arial.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"]
 
-        font_bold = next((ImageFont.truetype(f, 26) for f in caminhos_bold if os.path.exists(f) or "ttf" in f), ImageFont.load_default())
-        font_norm = next((ImageFont.truetype(f, 20) for f in caminhos_norm if os.path.exists(f) or "ttf" in f), ImageFont.load_default())
+        for f in c_bold:
+            try:
+                if os.path.exists(f):
+                    font_bold = ImageFont.truetype(f, 26)
+                    break
+            except: continue
+        for f in c_norm:
+            try:
+                if os.path.exists(f):
+                    font_norm = ImageFont.truetype(f, 20)
+                    break
+            except: continue
+
+        if not font_bold: font_bold = ImageFont.load_default()
+        if not font_norm: font_norm = ImageFont.load_default()
         
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
-        
         d.text((30, 30), "LISTA DE COMPRAS", fill=(0, 0, 0), font=font_bold)
         d.text((30, 65), f"{data_br}", fill=(100, 100, 100), font=font_norm)
         
@@ -117,7 +131,6 @@ class ListaComprasPro:
         for item in itens_lista:
             d.text((40, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
             y += espaco_item
-        
         d.text((30, y + 20), "by ®rvrs", fill=(150, 150, 150), font=font_norm)
         
         img_byte_arr = io.BytesIO()
@@ -134,7 +147,7 @@ class ListaComprasPro:
         texto_msg += "\n\n_by ®rvrs_"
         return f"https://wa.me/?text={urllib.parse.quote(texto_msg)}"
 
-# --- Interface Estilo ---
+# --- Interface ---
 st.markdown("""<style>
     .main-title { font-family: 'Arial Black'; text-align: center; border-bottom: 3px solid #000; text-transform: uppercase; font-size: 30px; }
     .stMarkdown h3 { background-color: #000; color: #fff !important; padding: 10px; border-radius: 5px; margin-top: 10px; }
@@ -170,7 +183,7 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
-# --- Lógica de Exibição e Captura ---
+# --- Exibição e Persistência ---
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
     itens_formatados = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
@@ -178,12 +191,10 @@ if modo_mercado:
     if filtrados:
         for item in sorted(filtrados, key=normalizar_texto):
             st.write(f"### [x] {item}")
-    else:
-        st.info("Nenhum item selecionado ou encontrado.")
+    else: st.info("Nenhum item selecionado ou encontrado.")
 else:
     col1, col2, col3 = st.columns(3)
-    categorias_ativas = list(st.session_state.categorias.items())
-    for i, (cat_nome, produtos) in enumerate(categorias_ativas):
+    for i, (cat_nome, produtos) in enumerate(st.session_state.categorias.items()):
         produtos_f = [p for p in produtos if busca_termo in normalizar_texto(p)]
         if produtos_f:
             with [col1, col2, col3][i % 3]:
@@ -193,16 +204,15 @@ else:
                     foi_sel = p in st.session_state.selecionados
                     qtd_ini = st.session_state.selecionados[p]['qtd'] if foi_sel else 1
                     with c1:
-                        marcado = st.checkbox(p, value=fo_sel if 'fo_sel' in locals() else foi_sel, key=f"chk_{p}_{cat_nome}")
+                        marcado = st.checkbox(p, value=foi_sel, key=f"chk_{p}_{cat_nome}")
                     if marcado:
                         with c2:
                             qtd = st.number_input("Q", 1, 100, qtd_ini, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
                         st.session_state.selecionados[p] = {'qtd': qtd}
                     else:
-                        if p in st.session_state.selecionados:
-                            del st.session_state.selecionados[p]
+                        if p in st.session_state.selecionados: del st.session_state.selecionados[p]
 
-# --- Preparação dos Dados para Exportação ---
+# --- Preparação e Exportação ---
 itens_para_exportar = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
 
 with st.sidebar:
