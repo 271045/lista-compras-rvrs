@@ -7,13 +7,19 @@ import urllib.parse
 import unicodedata
 import io
 import re
+import json
 
 try:
     import pytz
 except ImportError:
     pass
 
-# 1. Configuração da Página e Ícone
+# --- Configuração do Diretório de Listas ---
+DIRETORIO_LISTAS = "listas_salvas"
+if not os.path.exists(DIRETORIO_LISTAS):
+    os.makedirs(DIRETORIO_LISTAS)
+
+# 1. Configuração da Página
 try:
     caminho_icone = os.path.join(os.getcwd(), "favicon.png")
     img_favicon = Image.open(caminho_icone)
@@ -35,7 +41,7 @@ def normalizar_texto(texto):
                   if unicodedata.category(c) != 'Mn')
 
 def formatar_nome_arquivo(texto):
-    if not texto: return "lista-compras"
+    if not texto: return "lista"
     texto = normalizar_texto(texto)
     return re.sub(r'[^a-z0-9]', '-', texto)
 
@@ -64,12 +70,22 @@ class ListaComprasPro:
         }
         st.session_state.categorias = {k: sorted(v, key=normalizar_texto) for k, v in raw_data.items()}
 
-    def adicionar_item(self, nome):
-        nome_upper = str(nome).upper()
-        if nome_upper and nome_upper not in st.session_state.categorias["OUTROS"]:
-            st.session_state.categorias["OUTROS"].append(nome_upper)
-            st.session_state.categorias["OUTROS"].sort(key=normalizar_texto)
-            st.rerun()
+    def salvar_lista_json(self, nome_lista):
+        if not nome_lista:
+            st.error("Dê um nome para a lista antes de salvar!")
+            return
+        nome_arq = formatar_nome_arquivo(nome_lista) + ".json"
+        caminho = os.path.join(DIRETORIO_LISTAS, nome_arq)
+        with open(caminho, 'w', encoding='utf-8') as f:
+            json.dump(st.session_state.selecionados, f, ensure_ascii=False, indent=4)
+        st.success(f"Lista '{nome_lista}' salva com sucesso!")
+
+    def carregar_lista_json(self, arquivo_json):
+        caminho = os.path.join(DIRETORIO_LISTAS, arquivo_json)
+        with open(caminho, 'r', encoding='utf-8') as f:
+            st.session_state.selecionados = json.load(f)
+        st.session_state.reset_trigger += 1
+        st.rerun()
 
     def limpar_tudo(self):
         st.session_state.selecionados = {}
@@ -77,89 +93,47 @@ class ListaComprasPro:
         st.session_state.busca_key += 1
         st.rerun()
 
-    def criar_minha_lista(self):
-        st.session_state.selecionados = {}
-        for cat in list(st.session_state.categorias.keys()):
-            if cat != "OUTROS":
-                st.session_state.categorias[cat] = []
-        st.session_state.reset_trigger += 1
-        st.rerun()
-        
     def gerar_imagem(self, itens_lista, motivo_texto):
-        # Aumentamos a largura para a imagem ficar mais imponente
         largura = 600
         espaco_item = 45
         y_cabecalho = 180 if motivo_texto else 130
         altura_total = max(450, y_cabecalho + (len(itens_lista) * espaco_item) + 120)
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
-
-        # Caminhos de fontes comuns no Linux (GitHub Codespaces / Streamlit Cloud)
-        caminhos_bold = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
-        caminhos_norm = ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
-
-        # Busca a melhor fonte disponível ou usa a padrão do sistema em tamanho grande
-        font_bold = None
-        for f in caminhos_bold:
-            if os.path.exists(f):
-                font_bold = ImageFont.truetype(f, 32)
-                break
-        if not font_bold: font_bold = ImageFont.load_default(size=32)
-
-        font_norm = None
-        for f in caminhos_norm:
-            if os.path.exists(f):
-                font_norm = ImageFont.truetype(f, 24)
-                break
-        if not font_norm: font_norm = ImageFont.load_default(size=24)
-        
+        c_bold = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
+        c_norm = ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
+        font_bold = next((ImageFont.truetype(f, 32) for f in c_bold if os.path.exists(f)), ImageFont.load_default(size=32))
+        font_norm = next((ImageFont.truetype(f, 24) for f in c_norm if os.path.exists(f)), ImageFont.load_default(size=24))
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
-        
-        # Desenho
         d.text((40, 40), "LISTA DE COMPRAS", fill=(0, 0, 0), font=font_bold)
         d.text((40, 85), f"Data: {data_br}", fill=(100, 100, 100), font=font_norm)
-        
         y_linha = 130
         if motivo_texto:
             d.text((40, 125), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=font_bold)
             y_linha = 175
-            
         d.line((40, y_linha, largura-40, y_linha), fill=(0, 0, 0), width=3)
         y = y_linha + 30
         for item in itens_lista:
             d.text((50, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
             y += espaco_item
-        
         d.text((40, y + 30), "by ®rvrs", fill=(170, 170, 170), font=font_norm)
-        
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG')
         return img_byte_arr.getvalue()
 
-    def gerar_whatsapp_texto(self, lista_final, motivo_texto):
-        fuso_br = pytz.timezone('America/Sao_Paulo')
-        data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
-        texto_msg = f"*LISTA DE COMPRAS*\n*{data_br}*\n\n"
-        if motivo_texto:
-            texto_msg += f"*MOTIVO:* {str(motivo_texto).upper()}\n\n"
-        texto_msg += "\n".join([f"[x] {item}" for item in sorted(lista_final, key=normalizar_texto)])
-        texto_msg += "\n\n_by ®rvrs_"
-        return f"https://wa.me/?text={urllib.parse.quote(texto_msg)}"
-
 # --- Interface ---
+app = ListaComprasPro()
 st.markdown("""<style>
     .main-title { font-family: 'Arial Black'; text-align: center; border-bottom: 3px solid #000; text-transform: uppercase; font-size: 30px; }
     .stMarkdown h3 { background-color: #000; color: #fff !important; padding: 10px; border-radius: 5px; margin-top: 10px; }
     </style>""", unsafe_allow_html=True)
-
-app = ListaComprasPro()
 st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_html=True)
 
 # --- BUSCA ---
 c_busca, c_limpa = st.columns([4, 1])
 with c_busca:
-    busca_input = st.text_input("🔍 Pesquisar...", placeholder="Digite para filtrar...", key=f"input_busca_{st.session_state.busca_key}", label_visibility="collapsed")
+    busca_input = st.text_input("🔍 Pesquisar...", key=f"input_busca_{st.session_state.busca_key}", label_visibility="collapsed")
 with c_limpa:
     if st.button("❌ Limpar", use_container_width=True):
         st.session_state.busca_key += 1
@@ -169,31 +143,45 @@ busca_termo = normalizar_texto(busca_input)
 
 # --- Sidebar ---
 with st.sidebar:
-    st.header("📋 CONFIGURAÇÃO")
-    motivo_input = st.text_input("Motivo da Compra:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
+    st.header("💾 GERENCIAR LISTAS")
+    nome_salvar = st.text_input("Nome para salvar lista:", placeholder="Ex: Mensal Fevereiro")
+    if st.button("📥 SALVAR LISTA ATUAL", use_container_width=True):
+        app.salvar_lista_json(nome_salvar)
+    
+    arquivos_salvos = [f for f in os.listdir(DIRETORIO_LISTAS) if f.endswith('.json')]
+    if arquivos_salvos:
+        st.divider()
+        lista_escolhida = st.selectbox("Recuperar lista salva:", ["Selecionar..."] + arquivos_salvos)
+        if lista_escolhida != "Selecionar...":
+            if st.button("📂 CARREGAR SELECIONADA", use_container_width=True):
+                app.carregar_lista_json(lista_escolhida)
+    
     st.divider()
+    st.header("📋 OPÇÕES")
+    motivo_input = st.text_input("Motivo da Compra:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
     modo_mercado = st.toggle("## 🛒 MODO MERCADO ATIVO")
-    if st.button("✨ CRIAR MINHA LISTA", use_container_width=True): app.criar_minha_lista()
-    if st.button("🔄 RESTAURAR PADRÃO", use_container_width=True): 
-        app.resetar_estoque_padrao()
-        st.rerun()
     if st.button("🗑️ DESMARCAR TUDO", use_container_width=True): app.limpar_tudo()
     st.divider()
     with st.form("add_item", clear_on_submit=True):
-        novo = st.text_input("➕ Adicionar Item:")
-        if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
-
-# --- Processamento ---
-itens_para_exportar = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
+        novo = st.text_input("➕ Novo Item:")
+        if st.form_submit_button("ADICIONAR"):
+            nome_upper = str(novo).upper()
+            if nome_upper:
+                if nome_upper not in st.session_state.categorias["OUTROS"]:
+                    st.session_state.categorias["OUTROS"].append(nome_upper)
+                    st.session_state.categorias["OUTROS"].sort(key=normalizar_texto)
+                    st.rerun()
 
 # --- Exibição ---
+itens_para_exportar = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
+
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
     if itens_para_exportar:
         filtrados = [i for i in itens_para_exportar if busca_termo in normalizar_texto(i)]
         for item in sorted(filtrados, key=normalizar_texto):
             st.write(f"### [x] {item}")
-    else: st.info("Nenhum item selecionado.")
+    else: st.info("Nenhuma seleção ativa.")
 else:
     col1, col2, col3 = st.columns(3)
     for i, (cat_nome, produtos) in enumerate(st.session_state.categorias.items()):
@@ -206,7 +194,6 @@ else:
                     foi_sel = p in st.session_state.selecionados
                     qtd_ini = st.session_state.selecionados[p]['qtd'] if foi_sel else 1
                     with c1:
-                        # Chave única baseada no produto, categoria e reset_trigger para resetar visualmente
                         marcado = st.checkbox(p, value=foi_sel, key=f"chk_{p}_{cat_nome}_{st.session_state.reset_trigger}")
                     if marcado:
                         with c2:
@@ -215,15 +202,20 @@ else:
                     else:
                         if p in st.session_state.selecionados: del st.session_state.selecionados[p]
 
-# --- Exportação ---
+# --- Exportação Final ---
 with st.sidebar:
     st.divider()
     if itens_para_exportar:
-        url_wa = app.gerar_whatsapp_texto(itens_para_exportar, motivo_input)
-        st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">📲 ENVIAR WHATSAPP</div></a>', unsafe_allow_html=True)
-        nome_f = formatar_nome_arquivo(motivo_input)
+        fuso_br = pytz.timezone('America/Sao_Paulo')
+        data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
+        msg = f"*LISTA DE COMPRAS*\n*{data_br}*\n\n"
+        if motivo_input: msg += f"*MOTIVO:* {motivo_input.upper()}\n\n"
+        msg += "\n".join([f"[x] {item}" for item in sorted(itens_para_exportar, key=normalizar_texto)])
+        url_wa = f"https://wa.me/?text={urllib.parse.quote(msg + '\n\n_by ®rvrs_')}"
+        
+        st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">📲 WHATSAPP</div></a>', unsafe_allow_html=True)
         img_bytes = app.gerar_imagem(sorted(itens_para_exportar, key=normalizar_texto), motivo_input)
-        st.download_button("🖼️ BAIXAR IMAGEM", img_bytes, f"{nome_f}.png", "image/png", use_container_width=True)
+        st.download_button("🖼️ BAIXAR IMAGEM", img_bytes, f"{formatar_nome_arquivo(motivo_input)}.png", "image/png", use_container_width=True)
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
