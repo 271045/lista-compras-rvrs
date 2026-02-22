@@ -29,14 +29,12 @@ st.set_page_config(
 
 # 2. Funções de Suporte
 def normalizar_texto(texto):
-    """Remove acentos e padroniza para busca e ordenação."""
     if not texto: return ""
     texto = str(texto).strip().lower()
     return ''.join(c for c in unicodedata.normalize('NFD', texto)
                   if unicodedata.category(c) != 'Mn')
 
 def formatar_nome_arquivo(texto):
-    """Transforma o motivo em um nome de arquivo seguro."""
     if not texto: return "lista-compras"
     texto = normalizar_texto(texto)
     return re.sub(r'[^a-z0-9]', '-', texto)
@@ -74,7 +72,9 @@ class ListaComprasPro:
             st.rerun()
 
     def limpar_tudo(self):
+        # Limpa o dicionário principal de itens marcados
         st.session_state.selecionados = {}
+        # Reseta os widgets forçando a mudança da chave de reset
         st.session_state.reset_trigger += 1
         st.session_state.busca_key += 1
         st.rerun()
@@ -95,7 +95,6 @@ class ListaComprasPro:
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
 
-        # Lógica de Fontes Segura
         font_bold = None
         font_norm = None
         c_bold = ["arialbd.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]
@@ -183,7 +182,7 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
-# --- Exibição e Persistência ---
+# --- Exibição ---
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
     itens_formatados = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
@@ -203,11 +202,14 @@ else:
                     c1, c2 = st.columns([3, 1])
                     foi_sel = p in st.session_state.selecionados
                     qtd_ini = st.session_state.selecionados[p]['qtd'] if foi_sel else 1
+                    
+                    # A chave (key) do checkbox agora inclui o reset_trigger para garantir o reset visual
                     with c1:
-                        marcado = st.checkbox(p, value=foi_sel, key=f"chk_{p}_{cat_nome}")
+                        marcado = st.checkbox(p, value=foi_sel, key=f"chk_{p}_{cat_nome}_{st.session_state.reset_trigger}")
+                    
                     if marcado:
                         with c2:
-                            qtd = st.number_input("Q", 1, 100, qtd_ini, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
+                            qtd = st.number_input("Q", 1, 100, qtd_ini, key=f"q_{p}_{cat_nome}_{st.session_state.reset_trigger}", label_visibility="collapsed")
                         st.session_state.selecionados[p] = {'qtd': qtd}
                     else:
                         if p in st.session_state.selecionados: del st.session_state.selecionados[p]
