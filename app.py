@@ -45,6 +45,8 @@ class ListaComprasPro:
             self.resetar_estoque_padrao()
         if 'reset_trigger' not in st.session_state:
             st.session_state.reset_trigger = 0
+        if 'busca_valor' not in st.session_state:
+            st.session_state.busca_valor = ""
 
     def resetar_estoque_padrao(self):
         raw_data = {
@@ -72,6 +74,7 @@ class ListaComprasPro:
             if chave.startswith("check_"):
                 st.session_state[chave] = False
         st.session_state.reset_trigger += 1
+        st.session_state.busca_valor = "" # Limpa a busca ao resetar tudo
         st.rerun()
 
     def criar_minha_lista(self):
@@ -125,13 +128,14 @@ class ListaComprasPro:
         if motivo_texto:
             texto_msg += f"*MOTIVO:* {str(motivo_texto).upper()}\n\n"
         texto_msg += "\n".join([f"[x] {item}" for item in sorted(lista_final, key=normalizar_texto)])
-        texto_msg += "\n\n by ®rvrs"
+        texto_msg += "\n\n_by ®rvrs_"
         return f"https://wa.me/?text={urllib.parse.quote(texto_msg)}"
 
 # --- Interface Estilo ---
 st.markdown("""<style>
     .main-title { font-family: 'Arial Black'; text-align: center; border-bottom: 3px solid #000; text-transform: uppercase; font-size: 30px; }
     .stMarkdown h3 { background-color: #000; color: #fff !important; padding: 10px; border-radius: 5px; margin-top: 10px; }
+    div.stButton > button:first-child { background-color: #f0f2f6; border-radius: 5px; }
     </style>""", unsafe_allow_html=True)
 
 app = ListaComprasPro()
@@ -140,9 +144,17 @@ st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_htm
 # --- Variáveis de Processamento ---
 itens_para_exportar = []
 
-# BARRA DE BUSCA (Ajustada para ser o mais reativa possível)
-busca_input = st.text_input("🔍 Pesquisar item na lista...", placeholder="Digite para filtrar...")
-busca_termo = normalizar_texto(busca_input)
+# --- BLOCO DE BUSCA COM BOTÃO LIMPAR ---
+c_busca, c_limpa = st.columns([4, 1])
+with c_busca:
+    busca_input = st.text_input("🔍 Pesquisar item na lista...", value=st.session_state.busca_valor, key="campo_busca", label_visibility="collapsed", placeholder="Pesquisar item...")
+    st.session_state.busca_valor = busca_input
+with c_limpa:
+    if st.button("❌ Limpar", use_container_width=True):
+        st.session_state.busca_valor = ""
+        st.rerun()
+
+busca_termo = normalizar_texto(st.session_state.busca_valor)
 
 # --- Barra Lateral ---
 with st.sidebar:
