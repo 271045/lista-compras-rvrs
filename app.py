@@ -27,18 +27,18 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Funções de Suporte
-def remover_acentos(texto):
+# 2. Funções de Suporte (CORRIGIDAS PARA O FILTRO)
+def normalizar_texto(texto):
+    """Remove acentos, espaços extras e deixa em minúsculo para busca precisa."""
     if not texto: return ""
-    return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
+    texto = str(texto).strip().lower()
+    return ''.join(c for c in unicodedata.normalize('NFD', texto)
                   if unicodedata.category(c) != 'Mn')
 
 def formatar_nome_arquivo(texto):
-    if not texto:
-        return "lista-compras"
-    texto = remover_acentos(texto).lower()
-    texto = re.sub(r'[^a-z0-9]', '-', texto) 
-    return texto
+    if not texto: return "lista-compras"
+    texto = normalizar_texto(texto)
+    return re.sub(r'[^a-z0-9]', '-', texto)
 
 class ListaComprasPro:
     def __init__(self):
@@ -59,13 +59,13 @@ class ListaComprasPro:
             "BEBIDAS": ["ÁGUA MINERAL", "CERVEJA", "ENERGÉTICO", "REFRIGERANTE", "SUCO", "VINHO"],
             "OUTROS": []
         }
-        st.session_state.categorias = {k: sorted(v, key=remover_acentos) for k, v in raw_data.items()}
+        st.session_state.categorias = {k: sorted(v, key=normalizar_texto) for k, v in raw_data.items()}
 
     def adicionar_item(self, nome):
         nome_upper = str(nome).upper()
         if nome_upper and nome_upper not in st.session_state.categorias["OUTROS"]:
             st.session_state.categorias["OUTROS"].append(nome_upper)
-            st.session_state.categorias["OUTROS"].sort(key=remover_acentos)
+            st.session_state.categorias["OUTROS"].sort(key=normalizar_texto)
             st.rerun()
 
     def limpar_tudo(self):
@@ -92,7 +92,6 @@ class ListaComprasPro:
         altura_total = y_cabecalho + (len(itens_lista) * espaco_item) + 80
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
-        
         try:
             font_bold = ImageFont.truetype("arialbd.ttf", 26)
             font_norm = ImageFont.truetype("arial.ttf", 20)
@@ -102,7 +101,6 @@ class ListaComprasPro:
         
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
-        
         d.text((30, 30), "LISTA DE COMPRAS", fill=(0, 0, 0), font=font_bold)
         d.text((30, 65), f"{data_br}", fill=(100, 100, 100), font=font_norm)
         
@@ -110,13 +108,11 @@ class ListaComprasPro:
         if motivo_texto:
             d.text((30, 95), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=font_bold)
             y_linha = 135
-            
         d.line((30, y_linha, largura-30, y_linha), fill=(0, 0, 0), width=2)
         y = y_linha + 25
         for item in itens_lista:
             d.text((40, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
             y += espaco_item
-        
         d.text((30, y + 20), "by ®rvrs", fill=(150, 150, 150), font=font_norm)
         
         img_byte_arr = io.BytesIO()
@@ -126,15 +122,14 @@ class ListaComprasPro:
     def gerar_whatsapp_texto(self, lista_final, motivo_texto):
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
-        texto_msg = f"*LISTA DE COMPRAS*\n"
-        texto_msg += f"*{data_br}*\n\n"
+        texto_msg = f"*LISTA DE COMPRAS*\n*{data_br}*\n\n"
         if motivo_texto:
             texto_msg += f"*MOTIVO:* {str(motivo_texto).upper()}\n\n"
-        texto_msg += "\n".join([f"[x] {item}" for item in sorted(lista_final, key=remover_acentos)])
-        texto_msg += "\n\n_by ®rvrs_"
+        texto_msg += "\n".join([f"[x] {item}" for item in sorted(lista_final, key=normalizar_texto)])
+        texto_msg += "\n\n by ®rvrs"
         return f"https://wa.me/?text={urllib.parse.quote(texto_msg)}"
 
-# --- Interface Estilo CSS ---
+# --- Interface Estilo ---
 st.markdown("""<style>
     .main-title { font-family: 'Arial Black'; text-align: center; border-bottom: 3px solid #000; text-transform: uppercase; font-size: 30px; }
     .stMarkdown h3 { background-color: #000; color: #fff !important; padding: 10px; border-radius: 5px; margin-top: 10px; }
@@ -143,7 +138,9 @@ st.markdown("""<style>
 app = ListaComprasPro()
 st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_html=True)
 
+# --- Variáveis de Processamento ---
 itens_para_exportar = []
+busca_termo = normalizar_texto(st.text_input("🔍 Pesquisar item na lista...", placeholder="Ex: arroz"))
 
 # --- Barra Lateral ---
 with st.sidebar:
@@ -161,7 +158,7 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
-# --- Lógica de Processamento (Sempre processa antes de exibir) ---
+# --- Lógica de Processamento (Coleta TODOS os marcados independente do filtro) ---
 for k, v in st.session_state.items():
     if k.startswith("check_") and v:
         partes = k.split("_")
@@ -169,42 +166,37 @@ for k, v in st.session_state.items():
             nome_item = "_".join(partes[1:-1])
             cat_item = partes[-1]
             qtd = st.session_state.get(f"q_{nome_item}_{cat_item}", 1)
-            texto_final = f"{nome_item} ({qtd})"
-            if texto_final not in itens_para_exportar:
-                itens_para_exportar.append(texto_final)
+            item_f = f"{nome_item} ({qtd})"
+            if item_f not in itens_para_exportar:
+                itens_para_exportar.append(item_f)
 
-# --- Barra de Pesquisa ---
-busca = st.text_input("🔍 Pesquisar item na lista...", placeholder="Digite o nome do produto aqui...").upper()
-
-# --- Exibição Principal ---
+# --- Exibição ---
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
     if itens_para_exportar:
-        # Filtra também no modo mercado
-        itens_filtrados = [i for i in itens_para_exportar if busca in i]
-        for item in sorted(itens_filtrados, key=remover_acentos):
+        # Filtra na exibição se houver busca
+        filtrados = [i for i in itens_para_exportar if busca_termo in normalizar_texto(i)]
+        for item in sorted(filtrados, key=normalizar_texto):
             st.write(f"### [x] {item}")
     else:
         st.info("Nenhum item selecionado.")
 else:
     col1, col2, col3 = st.columns(3)
-    categorias_ativas = [(k, v) for k, v in st.session_state.categorias.items() if v or k == "OUTROS"]
+    categorias_ativas = list(st.session_state.categorias.items())
     
     for i, (cat_nome, produtos) in enumerate(categorias_ativas):
-        # Filtra os produtos da categoria baseada na busca
-        produtos_filtrados = [p for p in produtos if busca in remover_acentos(p).upper()]
+        # Filtra os produtos da categoria
+        produtos_f = [p for p in produtos if busca_termo in normalizar_texto(p)]
         
-        # Só exibe a categoria se houver produtos que batem com a busca
-        if produtos_filtrados:
-            col_atual = [col1, col2, col3][i % 3]
-            with col_atual:
+        if produtos_f:
+            with [col1, col2, col3][i % 3]:
                 st.subheader(str(cat_nome))
-                for p in produtos_filtrados:
-                    c_check, c_qtd = st.columns([3, 1])
-                    with c_check:
+                for p in produtos_f:
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
                         marcado = st.checkbox(p, key=f"check_{p}_{cat_nome}")
                     if marcado:
-                        with c_qtd:
+                        with c2:
                             st.number_input("Q", 1, 100, 1, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
 
 # --- Exportação na Sidebar ---
@@ -212,22 +204,10 @@ with st.sidebar:
     st.divider()
     if itens_para_exportar:
         url_wa = app.gerar_whatsapp_texto(itens_para_exportar, motivo_input)
-        st.markdown(f'''
-            <a href="{url_wa}" target="_blank" style="text-decoration:none;">
-                <div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">
-                    📲 ENVIAR WHATSAPP
-                </div>
-            </a>''', unsafe_allow_html=True)
-        
-        nome_final_arquivo = formatar_nome_arquivo(motivo_input)
-        img_bytes = app.gerar_imagem(sorted(itens_para_exportar, key=remover_acentos), motivo_input)
-        st.download_button(
-            label="🖼️ BAIXAR IMAGEM", 
-            data=img_bytes, 
-            file_name=f"{nome_final_arquivo}.png", 
-            mime="image/png", 
-            use_container_width=True
-        )
+        st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">📲 ENVIAR WHATSAPP</div></a>', unsafe_allow_html=True)
+        nome_f = formatar_nome_arquivo(motivo_input)
+        img_bytes = app.gerar_imagem(sorted(itens_para_exportar, key=normalizar_texto), motivo_input)
+        st.download_button("🖼️ BAIXAR IMAGEM", img_bytes, f"{nome_f}.png", "image/png", use_container_width=True)
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
