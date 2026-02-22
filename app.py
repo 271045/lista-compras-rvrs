@@ -13,7 +13,7 @@ try:
 except ImportError:
     pass
 
-# 1. Configuração da Página
+# 1. Configuração da Página e Ícone
 try:
     caminho_icone = os.path.join(os.getcwd(), "favicon.png")
     img_favicon = Image.open(caminho_icone)
@@ -29,12 +29,14 @@ st.set_page_config(
 
 # 2. Funções de Suporte
 def normalizar_texto(texto):
+    """Remove acentos e padroniza para busca e ordenação."""
     if not texto: return ""
     texto = str(texto).strip().lower()
     return ''.join(c for c in unicodedata.normalize('NFD', texto)
                   if unicodedata.category(c) != 'Mn')
 
 def formatar_nome_arquivo(texto):
+    """Transforma o motivo em um nome de arquivo seguro para download."""
     if not texto: return "lista-compras"
     texto = normalizar_texto(texto)
     return re.sub(r'[^a-z0-9]', '-', texto)
@@ -47,7 +49,6 @@ class ListaComprasPro:
             st.session_state.reset_trigger = 0
         if 'busca_key' not in st.session_state:
             st.session_state.busca_key = 0
-        # DICIONÁRIO PARA MANTER OS ITENS MARCADOS SALVOS
         if 'selecionados' not in st.session_state:
             st.session_state.selecionados = {}
 
@@ -93,15 +94,17 @@ class ListaComprasPro:
         altura_total = max(400, y_cabecalho + (len(itens_lista) * espaco_item) + 120)
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
-        try:
-            font_bold = ImageFont.truetype("arialbd.ttf", 26)
-            font_norm = ImageFont.truetype("arial.ttf", 20)
-        except:
-            font_bold = ImageFont.load_default()
-            font_norm = ImageFont.load_default()
+
+        # --- Bloco de Fontes Inteligentes (Windows/Linux) ---
+        caminhos_bold = ["arialbd.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
+        caminhos_norm = ["arial.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
+
+        font_bold = next((ImageFont.truetype(f, 26) for f in caminhos_bold if os.path.exists(f) or "ttf" in f), ImageFont.load_default())
+        font_norm = next((ImageFont.truetype(f, 20) for f in caminhos_norm if os.path.exists(f) or "ttf" in f), ImageFont.load_default())
         
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
+        
         d.text((30, 30), "LISTA DE COMPRAS", fill=(0, 0, 0), font=font_bold)
         d.text((30, 65), f"{data_br}", fill=(100, 100, 100), font=font_norm)
         
@@ -114,6 +117,7 @@ class ListaComprasPro:
         for item in itens_lista:
             d.text((40, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
             y += espaco_item
+        
         d.text((30, y + 20), "by ®rvrs", fill=(150, 150, 150), font=font_norm)
         
         img_byte_arr = io.BytesIO()
@@ -166,12 +170,11 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
-# --- Exibição ---
+# --- Lógica de Exibição e Captura ---
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
     itens_formatados = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
     filtrados = [i for i in itens_formatados if busca_termo in normalizar_texto(i)]
-    
     if filtrados:
         for item in sorted(filtrados, key=normalizar_texto):
             st.write(f"### [x] {item}")
@@ -180,7 +183,6 @@ if modo_mercado:
 else:
     col1, col2, col3 = st.columns(3)
     categorias_ativas = list(st.session_state.categorias.items())
-    
     for i, (cat_nome, produtos) in enumerate(categorias_ativas):
         produtos_f = [p for p in produtos if busca_termo in normalizar_texto(p)]
         if produtos_f:
@@ -188,24 +190,19 @@ else:
                 st.subheader(str(cat_nome))
                 for p in produtos_f:
                     c1, c2 = st.columns([3, 1])
-                    # Verifica se o item já estava selecionado
-                    foi_selecionado = p in st.session_state.selecionados
-                    qtd_atual = st.session_state.selecionados[p]['qtd'] if foi_selecionado else 1
-                    
+                    foi_sel = p in st.session_state.selecionados
+                    qtd_ini = st.session_state.selecionados[p]['qtd'] if foi_sel else 1
                     with c1:
-                        marcado = st.checkbox(p, value=foi_selecionado, key=f"chk_{p}_{cat_nome}")
-                    
+                        marcado = st.checkbox(p, value=fo_sel if 'fo_sel' in locals() else foi_sel, key=f"chk_{p}_{cat_nome}")
                     if marcado:
                         with c2:
-                            qtd = st.number_input("Q", 1, 100, qtd_atual, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
-                        # Salva/Atualiza no dicionário fixo
+                            qtd = st.number_input("Q", 1, 100, qtd_ini, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
                         st.session_state.selecionados[p] = {'qtd': qtd}
                     else:
-                        # Se desmarcar, remove do dicionário
                         if p in st.session_state.selecionados:
                             del st.session_state.selecionados[p]
 
-# --- Exportação na Sidebar ---
+# --- Preparação dos Dados para Exportação ---
 itens_para_exportar = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
 
 with st.sidebar:
