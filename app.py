@@ -70,23 +70,6 @@ class ListaComprasPro:
         }
         st.session_state.categorias = {k: sorted(v, key=normalizar_texto) for k, v in raw_data.items()}
 
-    def salvar_lista_json(self, nome_lista):
-        if not nome_lista:
-            st.error("Dê um nome para a lista antes de salvar!")
-            return
-        nome_arq = formatar_nome_arquivo(nome_lista) + ".json"
-        caminho = os.path.join(DIRETORIO_LISTAS, nome_arq)
-        with open(caminho, 'w', encoding='utf-8') as f:
-            json.dump(st.session_state.selecionados, f, ensure_ascii=False, indent=4)
-        st.success(f"Lista '{nome_lista}' salva com sucesso!")
-
-    def carregar_lista_json(self, arquivo_json):
-        caminho = os.path.join(DIRETORIO_LISTAS, arquivo_json)
-        with open(caminho, 'r', encoding='utf-8') as f:
-            st.session_state.selecionados = json.load(f)
-        st.session_state.reset_trigger += 1
-        st.rerun()
-
     def limpar_tudo(self):
         st.session_state.selecionados = {}
         st.session_state.reset_trigger += 1
@@ -122,18 +105,19 @@ class ListaComprasPro:
         img.save(img_byte_arr, format='PNG')
         return img_byte_arr.getvalue()
 
-# --- Interface ---
-app = ListaComprasPro()
+# --- Interface Estilo ---
 st.markdown("""<style>
     .main-title { font-family: 'Arial Black'; text-align: center; border-bottom: 3px solid #000; text-transform: uppercase; font-size: 30px; }
     .stMarkdown h3 { background-color: #000; color: #fff !important; padding: 10px; border-radius: 5px; margin-top: 10px; }
     </style>""", unsafe_allow_html=True)
+
+app = ListaComprasPro()
 st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_html=True)
 
-# --- BUSCA ---
+# --- BLOCO DE BUSCA ---
 c_busca, c_limpa = st.columns([4, 1])
 with c_busca:
-    busca_input = st.text_input("🔍 Pesquisar...", key=f"input_busca_{st.session_state.busca_key}", label_visibility="collapsed")
+    busca_input = st.text_input("🔍 Pesquisar...", key=f"input_busca_{st.session_state.busca_key}", label_visibility="collapsed", placeholder="Pesquisar item...")
 with c_limpa:
     if st.button("❌ Limpar", use_container_width=True):
         st.session_state.busca_key += 1
@@ -144,33 +128,43 @@ busca_termo = normalizar_texto(busca_input)
 # --- Sidebar ---
 with st.sidebar:
     st.header("💾 GERENCIAR LISTAS")
-    nome_salvar = st.text_input("Nome para salvar lista:", placeholder="Ex: Mensal Fevereiro")
+    nome_salvar = st.text_input("Nome da Lista:", placeholder="Ex: Compra Mensal")
     if st.button("📥 SALVAR LISTA ATUAL", use_container_width=True):
-        app.salvar_lista_json(nome_salvar)
+        if nome_salvar:
+            caminho = os.path.join(DIRETORIO_LISTAS, formatar_nome_arquivo(nome_salvar) + ".json")
+            with open(caminho, 'w', encoding='utf-8') as f:
+                json.dump(st.session_state.selecionados, f, ensure_ascii=False, indent=4)
+            st.success("Lista salva!")
+        else:
+            st.warning("Dê um nome à lista!")
     
     arquivos_salvos = [f for f in os.listdir(DIRETORIO_LISTAS) if f.endswith('.json')]
     if arquivos_salvos:
         st.divider()
-        lista_escolhida = st.selectbox("Recuperar lista salva:", ["Selecionar..."] + arquivos_salvos)
+        lista_escolhida = st.selectbox("Recuperar lista:", ["Selecionar..."] + arquivos_salvos)
         if lista_escolhida != "Selecionar...":
-            if st.button("📂 CARREGAR SELECIONADA", use_container_width=True):
-                app.carregar_lista_json(lista_escolhida)
+            if st.button("📂 CARREGAR", use_container_width=True):
+                caminho = os.path.join(DIRETORIO_LISTAS, lista_escolhida)
+                with open(caminho, 'r', encoding='utf-8') as f:
+                    st.session_state.selecionados = json.load(f)
+                st.session_state.reset_trigger += 1
+                st.rerun()
     
     st.divider()
-    st.header("📋 OPÇÕES")
-    motivo_input = st.text_input("Motivo da Compra:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
-    modo_mercado = st.toggle("## 🛒 MODO MERCADO ATIVO")
+    st.header("📋 CONFIGURAÇÃO")
+    motivo_input = st.text_input("Motivo:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
+    modo_mercado = st.toggle("## 🛒 MODO MERCADO")
     if st.button("🗑️ DESMARCAR TUDO", use_container_width=True): app.limpar_tudo()
+    
     st.divider()
     with st.form("add_item", clear_on_submit=True):
         novo = st.text_input("➕ Novo Item:")
-        if st.form_submit_button("ADICIONAR"):
-            nome_upper = str(novo).upper()
-            if nome_upper:
-                if nome_upper not in st.session_state.categorias["OUTROS"]:
-                    st.session_state.categorias["OUTROS"].append(nome_upper)
-                    st.session_state.categorias["OUTROS"].sort(key=normalizar_texto)
-                    st.rerun()
+        if st.form_submit_button("ADICIONAR") and novo:
+            n_up = novo.upper()
+            if n_up not in st.session_state.categorias["OUTROS"]:
+                st.session_state.categorias["OUTROS"].append(n_up)
+                st.session_state.categorias["OUTROS"].sort(key=normalizar_texto)
+                st.rerun()
 
 # --- Exibição ---
 itens_para_exportar = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
@@ -181,10 +175,11 @@ if modo_mercado:
         filtrados = [i for i in itens_para_exportar if busca_termo in normalizar_texto(i)]
         for item in sorted(filtrados, key=normalizar_texto):
             st.write(f"### [x] {item}")
-    else: st.info("Nenhuma seleção ativa.")
+    else: st.info("Nada selecionado.")
 else:
     col1, col2, col3 = st.columns(3)
-    for i, (cat_nome, produtos) in enumerate(st.session_state.categorias.items()):
+    categorias_lista = list(st.session_state.categorias.items())
+    for i, (cat_nome, produtos) in enumerate(categorias_lista):
         produtos_f = [p for p in produtos if busca_termo in normalizar_texto(p)]
         if produtos_f:
             with [col1, col2, col3][i % 3]:
@@ -202,7 +197,7 @@ else:
                     else:
                         if p in st.session_state.selecionados: del st.session_state.selecionados[p]
 
-# --- Exportação Final ---
+# --- Exportação ---
 with st.sidebar:
     st.divider()
     if itens_para_exportar:
@@ -212,7 +207,6 @@ with st.sidebar:
         if motivo_input: msg += f"*MOTIVO:* {motivo_input.upper()}\n\n"
         msg += "\n".join([f"[x] {item}" for item in sorted(itens_para_exportar, key=normalizar_texto)])
         url_wa = f"https://wa.me/?text={urllib.parse.quote(msg + '\n\n_by ®rvrs_')}"
-        
         st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">📲 WHATSAPP</div></a>', unsafe_allow_html=True)
         img_bytes = app.gerar_imagem(sorted(itens_para_exportar, key=normalizar_texto), motivo_input)
         st.download_button("🖼️ BAIXAR IMAGEM", img_bytes, f"{formatar_nome_arquivo(motivo_input)}.png", "image/png", use_container_width=True)
