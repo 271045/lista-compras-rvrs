@@ -88,10 +88,10 @@ class ListaComprasPro:
         st.rerun()
         
     def gerar_imagem(self, itens_lista, motivo_texto):
-        largura = 600
-        espaco_item = 40
-        y_cabecalho = 180 if motivo_texto else 130
-        altura_total = y_cabecalho + (len(itens_lista) * espaco_item) + 100
+        largura = 550
+        espaco_item = 35
+        y_cabecalho = 150 if motivo_texto else 100
+        altura_total = y_cabecalho + (len(itens_lista) * espaco_item) + 80
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
         
@@ -105,19 +105,21 @@ class ListaComprasPro:
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
         
-        d.text((40, 35), "Lista de Compras", fill=(0, 0, 0), font=font_bold)
-        d.text((40, 75), f"{data_br}", fill=(100, 100, 100), font=font_norm)
+        d.text((30, 30), "LISTA DE COMPRAS", fill=(0, 0, 0), font=font_bold)
+        d.text((30, 65), f"{data_br}", fill=(100, 100, 100), font=font_norm)
         
-        y_linha = 120
+        y_linha = 100
         if motivo_texto:
-            d.text((40, 115), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=font_bold)
-            y_linha = 155
+            d.text((30, 95), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=font_bold)
+            y_linha = 135
             
-        d.line((40, y_linha, largura-40, y_linha), fill=(0, 0, 0), width=3)
-        y = y_linha + 30
+        d.line((30, y_linha, largura-30, y_linha), fill=(0, 0, 0), width=2)
+        y = y_linha + 25
         for item in itens_lista:
-            d.text((45, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
+            d.text((40, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
             y += espaco_item
+        
+        d.text((30, y + 20), "by ®rvrs", fill=(150, 150, 150), font=font_norm)
         
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG')
@@ -222,3 +224,4 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
