@@ -45,9 +45,11 @@ class ListaComprasPro:
             self.resetar_estoque_padrao()
         if 'reset_trigger' not in st.session_state:
             st.session_state.reset_trigger = 0
-        # Chave para forçar o reset do campo de busca
         if 'busca_key' not in st.session_state:
             st.session_state.busca_key = 0
+        # DICIONÁRIO PARA MANTER OS ITENS MARCADOS SALVOS
+        if 'selecionados' not in st.session_state:
+            st.session_state.selecionados = {}
 
     def resetar_estoque_padrao(self):
         raw_data = {
@@ -71,17 +73,13 @@ class ListaComprasPro:
             st.rerun()
 
     def limpar_tudo(self):
-        for chave in list(st.session_state.keys()):
-            if chave.startswith("check_"):
-                st.session_state[chave] = False
+        st.session_state.selecionados = {}
         st.session_state.reset_trigger += 1
-        st.session_state.busca_key += 1 # Reseta a barra de busca
+        st.session_state.busca_key += 1
         st.rerun()
 
     def criar_minha_lista(self):
-        for chave in list(st.session_state.keys()):
-            if chave.startswith("check_"):
-                st.session_state[chave] = False
+        st.session_state.selecionados = {}
         for cat in list(st.session_state.categorias.keys()):
             if cat != "OUTROS":
                 st.session_state.categorias[cat] = []
@@ -144,13 +142,7 @@ st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_htm
 # --- BLOCO DE BUSCA ---
 c_busca, c_limpa = st.columns([4, 1])
 with c_busca:
-    # A chave (key) muda sempre que clicamos em limpar, resetando o campo
-    busca_input = st.text_input(
-        "🔍 Pesquisar...", 
-        placeholder="Digite o item...", 
-        key=f"input_busca_{st.session_state.busca_key}",
-        label_visibility="collapsed"
-    )
+    busca_input = st.text_input("🔍 Pesquisar...", placeholder="Digite o item...", key=f"input_busca_{st.session_state.busca_key}", label_visibility="collapsed")
 with c_limpa:
     if st.button("❌ Limpar", use_container_width=True):
         st.session_state.busca_key += 1
@@ -174,28 +166,17 @@ with st.sidebar:
         novo = st.text_input("➕ Adicionar Item:")
         if st.form_submit_button("ADICIONAR") and novo: app.adicionar_item(novo)
 
-# --- Processamento Global ---
-itens_para_exportar = []
-for k, v in st.session_state.items():
-    if k.startswith("check_") and v:
-        partes = k.split("_")
-        if len(partes) >= 2:
-            nome_item = "_".join(partes[1:-1])
-            cat_item = partes[-1]
-            qtd = st.session_state.get(f"q_{nome_item}_{cat_item}", 1)
-            item_f = f"{nome_item} ({qtd})"
-            if item_f not in itens_para_exportar:
-                itens_para_exportar.append(item_f)
-
 # --- Exibição ---
 if modo_mercado:
     st.markdown("## 🛒 MODO MERCADO")
-    if itens_para_exportar:
-        filtrados = [i for i in itens_para_exportar if busca_termo in normalizar_texto(i)]
+    itens_formatados = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
+    filtrados = [i for i in itens_formatados if busca_termo in normalizar_texto(i)]
+    
+    if filtrados:
         for item in sorted(filtrados, key=normalizar_texto):
             st.write(f"### [x] {item}")
     else:
-        st.info("Nenhum item selecionado.")
+        st.info("Nenhum item selecionado ou encontrado.")
 else:
     col1, col2, col3 = st.columns(3)
     categorias_ativas = list(st.session_state.categorias.items())
@@ -207,13 +188,26 @@ else:
                 st.subheader(str(cat_nome))
                 for p in produtos_f:
                     c1, c2 = st.columns([3, 1])
+                    # Verifica se o item já estava selecionado
+                    foi_selecionado = p in st.session_state.selecionados
+                    qtd_atual = st.session_state.selecionados[p]['qtd'] if foi_selecionado else 1
+                    
                     with c1:
-                        marcado = st.checkbox(p, key=f"check_{p}_{cat_nome}")
+                        marcado = st.checkbox(p, value=foi_selecionado, key=f"chk_{p}_{cat_nome}")
+                    
                     if marcado:
                         with c2:
-                            st.number_input("Q", 1, 100, 1, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
+                            qtd = st.number_input("Q", 1, 100, qtd_atual, key=f"q_{p}_{cat_nome}", label_visibility="collapsed")
+                        # Salva/Atualiza no dicionário fixo
+                        st.session_state.selecionados[p] = {'qtd': qtd}
+                    else:
+                        # Se desmarcar, remove do dicionário
+                        if p in st.session_state.selecionados:
+                            del st.session_state.selecionados[p]
 
 # --- Exportação na Sidebar ---
+itens_para_exportar = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
+
 with st.sidebar:
     st.divider()
     if itens_para_exportar:
