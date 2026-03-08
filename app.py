@@ -76,7 +76,7 @@ class ListaComprasPro:
         img.save(buf, format='PNG')
         return buf.getvalue()
 
-# --- Interface Principal ---
+# --- Interface ---
 app = ListaComprasPro()
 st.markdown("<h1 style='text-align:center;'>🛒 Lista de Compras (Nuvem)</h1>", unsafe_allow_html=True)
 
@@ -85,14 +85,14 @@ with st.sidebar:
     nome_lista_nuvem = st.text_input("Nome para salvar:", placeholder="Ex: Mensal", key=f"cloud_name_{st.session_state.reset_trigger}")
     
     if st.button("📥 SALVAR NA PLANILHA", use_container_width=True):
-        selecionados = [k.split("_")[1] for k, v in st.session_state.items() if k.startswith("check_") and v]
-        if nome_lista_nuvem and selecionados:
+        selecionados_nomes = [k.split("_")[1] for k, v in st.session_state.items() if k.startswith("check_") and v]
+        if nome_lista_nuvem and selecionados_nomes:
             try:
                 df_atual = conn.read(ttl=0)
                 novo_dado = pd.DataFrame([{
                     "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
                     "nome_lista": nome_lista_nuvem.upper(),
-                    "itens_json": json.dumps(selecionados, ensure_ascii=False)
+                    "itens_json": json.dumps(selecionados_nomes, ensure_ascii=False)
                 }])
                 df_final = pd.concat([df_atual, novo_dado], ignore_index=True)
                 conn.update(data=df_final)
@@ -108,14 +108,49 @@ with st.sidebar:
     try:
         df_nuvem = conn.read(ttl=0)
         if not df_nuvem.empty:
-            escolha = st.selectbox("Abrir lista salva:", ["Selecionar..."] + list(df_nuvem['nome_lista'].unique()))
+            opcoes = ["Selecionar..."] + list(df_nuvem['nome_lista'].unique())
+            escolha = st.selectbox("Abrir lista salva:", opcoes)
             if escolha != "Selecionar..." and st.button("📂 CARREGAR LISTA"):
-                itens_recuperados = json.loads(df_nuvem[df_nuvem['nome_lista'] == escolha].iloc[-1]['itens_json'])
-                # Reseta e marca os itens recuperados
+                dados_linha = df_nuvem[df_nuvem['nome_lista'] == escolha].iloc[-1]
+                itens_recuperados = json.loads(dados_linha['itens_json'])
+                
+                # Desmarca tudo primeiro
                 for chave in list(st.session_state.keys()):
-                    if chave.startswith("check_"): st.session_state[chave] = False
+                    if chave.startswith("check_"):
+                        st.session_state[chave] = False
+                
+                # Marca os itens recuperados
                 for item in itens_recuperados:
-                    # Tenta encontrar a chave correta baseada no nome do item
-                    for k in st.session_state.categorias.keys():
-                        key_tentativa = f"check_{item}_{k}"
-                        if key_tentativa in st.
+                    for cat_k in st.session_state.categorias.keys():
+                        key_final = f"check_{item}_{cat_k}"
+                        if key_final in st.session_state:
+                            st.session_state[key_final] = True
+                st.rerun()
+    except:
+        pass
+
+    if st.button("🗑️ LIMPAR TELA", use_container_width=True): app.limpar_tudo()
+
+# --- Grid Principal ---
+selecionados_atual = [k.split("_")[1] for k, v in st.session_state.items() if k.startswith("check_") and v]
+
+col1, col2, col3 = st.columns(3)
+for i, (cat, produtos) in enumerate(st.session_state.categorias.items()):
+    with [col1, col2, col3][i % 3]:
+        st.subheader(cat)
+        for p in produtos:
+            st.checkbox(p, key=f"check_{p}_{cat}")
+
+# --- Exportação ---
+if selecionados_atual:
+    st.divider()
+    c_img, c_wa = st.columns(2)
+    with c_img:
+        img_bytes = app.gerar_imagem(sorted(selecionados_atual, key=remover_acentos), nome_lista_nuvem)
+        st.download_button("🖼️ BAIXAR IMAGEM", img_bytes, "lista.png", use_container_width=True)
+    with c_wa:
+        msg_wa = f"*LISTA DE COMPRAS*\n" + "\n".join([f"[X] {i}" for i in sorted(selecionados_atual, key=remover_acentos)])
+        url_wa = f"https://wa.me/?text={urllib.parse.quote(msg_wa + '\n\n_by ®rvrs_')}"
+        st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:10px;border-radius:5px;text-align:center;font-weight:bold;">📲 WHATSAPP</div></a>', unsafe_allow_html=True)
+
+st.markdown("<hr><p style='text-align:center;'>2026 | Desenvolvido por ®rvrs</p>", unsafe_allow_html=True)
