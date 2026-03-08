@@ -16,22 +16,28 @@ try:
 except ImportError:
     pass
 
-# 1. Configuração da Página
+# 1. Configuração da Página (Exatamente como o seu)
+try:
+    caminho_icone = os.path.join(os.getcwd(), "favicon.png")
+    img_favicon = Image.open(caminho_icone)
+except:
+    img_favicon = "🛒"
+
 st.set_page_config(
     page_title="🛒Lista Compras ®rvrs",
-    page_icon="🛒", 
+    page_icon=img_favicon, 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 2. Conexão com Google Sheets
+# 2. Conexão com Google Sheets (Adicionado para a Nuvem)
 conn = None
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception as e:
-    st.error(f"Erro de Conexão: {e}")
+    st.error(f"Erro nos Secrets! Verifique a chave do Google: {e}")
 
-# 3. Funções de Suporte (Suas Originais)
+# 3. Suas Funções de Suporte (Mantidas idênticas)
 def normalizar_texto(texto):
     if not texto: return ""
     texto = str(texto).strip().lower()
@@ -99,7 +105,7 @@ class ListaComprasPro:
         img.save(img_byte_arr, format='PNG')
         return img_byte_arr.getvalue()
 
-# --- Estilo ---
+# --- Interface Estilo ---
 st.markdown("""<style>
     .main-title { font-family: 'Arial Black'; text-align: center; border-bottom: 3px solid #000; text-transform: uppercase; font-size: 30px; }
     .stMarkdown h3 { background-color: #000; color: #fff !important; padding: 10px; border-radius: 5px; margin-top: 10px; }
@@ -108,7 +114,7 @@ st.markdown("""<style>
 app = ListaComprasPro()
 st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_html=True)
 
-# --- BUSCA ---
+# --- BLOCO DE BUSCA ---
 c_busca, c_limpa = st.columns([4, 1])
 with c_busca:
     busca_input = st.text_input("🔍 Pesquisar...", key=f"input_busca_{st.session_state.busca_key}", label_visibility="collapsed", placeholder="Pesquisar item...")
@@ -119,31 +125,35 @@ with c_limpa:
 
 busca_termo = normalizar_texto(busca_input)
 
-# --- SIDEBAR (NUVEM E CONFIGS) ---
+# --- Sidebar (Aqui trocamos Arquivo por Planilha) ---
 with st.sidebar:
     st.header("💾 NUVEM GOOGLE")
     nome_salvar = st.text_input("Nome da Lista:", placeholder="Ex: Compra Mensal")
     
-    if st.button("📥 SALVAR NO GOOGLE", use_container_width=True):
+    if st.button("📥 SALVAR NA NUVEM", use_container_width=True):
         if conn and nome_salvar and st.session_state.selecionados:
             try:
                 df_old = conn.read(ttl=0)
                 novo = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "nome_lista": nome_salvar.upper(), "itens_json": json.dumps(st.session_state.selecionados, ensure_ascii=False)}])
                 conn.update(data=pd.concat([df_old, novo], ignore_index=True))
-                st.success("Lista salva na Nuvem!")
-            except Exception as e: st.error(f"Erro: {e}")
-        else: st.warning("Dê um nome e marque itens!")
+                st.success("Salvo na Planilha!")
+            except Exception as e:
+                st.error(f"Erro: {e}")
+        else:
+            st.warning("Dê um nome e marque itens!")
 
+    # Recuperar da Planilha
     if conn:
         try:
-            df_lido = conn.read(ttl=0)
-            if not df_lido.empty:
+            df_nuvem = conn.read(ttl=0)
+            if not df_nuvem.empty:
                 st.divider()
-                escolha = st.selectbox("Recuperar lista:", ["Selecionar..."] + list(df_lido['nome_lista'].unique()))
+                escolha = st.selectbox("Recuperar lista:", ["Selecionar..."] + list(df_nuvem['nome_lista'].unique()))
                 if escolha != "Selecionar..." and st.button("📂 CARREGAR"):
-                    st.session_state.selecionados = json.loads(df_lido[df_lido['nome_lista'] == escolha].iloc[-1]['itens_json'])
+                    st.session_state.selecionados = json.loads(df_nuvem[df_nuvem['nome_lista'] == escolha].iloc[-1]['itens_json'])
                     st.rerun()
-        except: pass
+        except:
+            pass
 
     st.divider()
     st.header("📋 CONFIGURAÇÃO")
@@ -151,6 +161,7 @@ with st.sidebar:
     modo_mercado = st.toggle("## 🛒 MODO MERCADO")
     if st.button("🗑️ DESMARCAR TUDO", use_container_width=True): app.limpar_tudo()
     
+    st.divider()
     with st.form("add_item", clear_on_submit=True):
         novo = st.text_input("➕ Novo Item:")
         if st.form_submit_button("ADICIONAR") and novo:
@@ -160,7 +171,7 @@ with st.sidebar:
                 st.session_state.categorias["OUTROS"].sort(key=normalizar_texto)
                 st.rerun()
 
-# --- EXIBIÇÃO ---
+# --- Exibição Principal (Idêntica à sua) ---
 itens_para_exportar = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
 
 if modo_mercado:
@@ -191,14 +202,15 @@ else:
                     else:
                         if p in st.session_state.selecionados: del st.session_state.selecionados[p]
 
-# --- EXPORTAÇÃO (NA SIDEBAR) ---
+# --- Exportação (WhatsApp e Imagem na Sidebar) ---
 with st.sidebar:
     st.divider()
     if itens_para_exportar:
-        msg = f"*LISTA DE COMPRAS*\n\n"
+        data_br = datetime.now().strftime("%d/%m/%Y")
+        msg = f"*LISTA DE COMPRAS*\n*{data_br}*\n\n"
         if motivo_input: msg += f"*MOTIVO:* {motivo_input.upper()}\n\n"
         msg += "\n".join([f"- {item}" for item in sorted(itens_para_exportar, key=normalizar_texto)])
-        url_wa = f"https://wa.me/?text={urllib.parse.quote(msg)}"
+        url_wa = f"https://wa.me/?text={urllib.parse.quote(msg + '\n\n_by ®rvrs_')}"
         st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:10px;">📲 WHATSAPP</div></a>', unsafe_allow_html=True)
         img_bytes = app.gerar_imagem(sorted(itens_para_exportar, key=normalizar_texto), motivo_input)
         st.download_button("🖼️ BAIXAR IMAGEM", img_bytes, "lista.png", "image/png", use_container_width=True)
