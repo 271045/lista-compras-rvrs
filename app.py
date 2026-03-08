@@ -131,7 +131,9 @@ with st.sidebar:
                 novo = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "nome_lista": nome_salvar.upper(), "itens_json": json.dumps(st.session_state.selecionados, ensure_ascii=False)}])
                 conn.update(data=pd.concat([df_old, novo], ignore_index=True))
                 st.success("Lista salva no Google!")
-            except: st.error("Erro ao salvar na nuvem.")
+            except Exception as e:
+                # ISSO VAI MOSTRAR O ERRO REAL NA TELA
+                st.error(f"Erro técnico: {e}")
         else: st.warning("Dê um nome e marque itens!")
     
     # Carregar da Planilha
@@ -207,3 +209,4 @@ with st.sidebar:
 
 st.markdown("---")
 st.markdown("<p style='text-align:center; color:grey;'>2026 🛒Lista de Compras | by ®rvrs</p>", unsafe_allow_html=True)
+
