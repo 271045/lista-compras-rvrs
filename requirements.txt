@@ -1,3 +1,5 @@
 streamlit
-pytz
+st-gsheets-connection
+pandas
 Pillow
+pytz
