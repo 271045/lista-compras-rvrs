@@ -15,10 +15,10 @@ try:
 except ImportError:
     pass
 
-# 1. Configuração da Página
+# 1. Configuração da Página (ORIGINAL)
 try:
     caminho_icone = os.path.join(os.getcwd(), "favicon.png")
-    img_favicon = Image.open(camin_icone)
+    img_favicon = Image.open(caminho_icone)
 except:
     img_favicon = "🛒"
 
@@ -29,14 +29,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- CONEXÃO COM GOOGLE SHEETS (Adicionado) ---
+# --- CONEXÃO COM GOOGLE SHEETS (O único acréscimo) ---
 conn = None
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception as e:
     st.error(f"Erro nos Secrets! Verifique a chave do Google: {e}")
 
-# 2. Funções de Suporte (Suas Originais)
+# 2. Funções de Suporte (ORIGINAIS)
 def normalizar_texto(texto):
     if not texto: return ""
     texto = str(texto).strip().lower()
@@ -86,27 +86,32 @@ class ListaComprasPro:
         altura_total = max(450, y_cabecalho + (len(itens_lista) * espaco_item) + 120)
         img = Image.new('RGB', (largura, altura_total), color=(255, 255, 255))
         d = ImageDraw.Draw(img)
-        font_bold = ImageFont.load_default()
-        font_norm = ImageFont.load_default()
+        # Fontes originais que você configurou
+        c_bold = ["/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
+        c_norm = ["/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
+        font_bold = next((ImageFont.truetype(f, 32) for f in c_bold if os.path.exists(f)), ImageFont.load_default())
+        font_norm = next((ImageFont.truetype(f, 24) for f in c_norm if os.path.exists(f)), ImageFont.load_default())
+        
         fuso_br = pytz.timezone('America/Sao_Paulo')
         data_br = datetime.now(fuso_br).strftime("%d/%m/%Y")
-        d.text((40, 40), "LISTA DE COMPRAS", fill=(0, 0, 0))
-        d.text((40, 85), f"Data: {data_br}", fill=(100, 100, 100))
+        
+        d.text((40, 40), "LISTA DE COMPRAS", fill=(0, 0, 0), font=font_bold)
+        d.text((40, 85), f"Data: {data_br}", fill=(100, 100, 100), font=font_norm)
         y_linha = 130
         if motivo_texto:
-            d.text((40, 125), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153))
+            d.text((40, 125), f"MOTIVO: {str(motivo_texto).upper()}", fill=(0, 51, 153), font=font_bold)
             y_linha = 175
         d.line((40, y_linha, largura-40, y_linha), fill=(0, 0, 0), width=3)
         y = y_linha + 30
         for item in itens_lista:
-            d.text((50, y), f"[x] {item}", fill=(0, 0, 0))
+            d.text((50, y), f"[x] {item}", fill=(0, 0, 0), font=font_norm)
             y += espaco_item
-        d.text((40, y + 30), "by ®rvrs", fill=(170, 170, 170))
+        d.text((40, y + 30), "by ®rvrs", fill=(170, 170, 170), font=font_norm)
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG')
         return img_byte_arr.getvalue()
 
-# --- Interface Estilo ---
+# --- Interface Estilo (ORIGINAL) ---
 st.markdown("""<style>
     .main-title { font-family: 'Arial Black'; text-align: center; border-bottom: 3px solid #000; text-transform: uppercase; font-size: 30px; }
     .stMarkdown h3 { background-color: #000; color: #fff !important; padding: 10px; border-radius: 5px; margin-top: 10px; }
@@ -115,7 +120,7 @@ st.markdown("""<style>
 app = ListaComprasPro()
 st.markdown('<h1 class="main-title">🛒Lista de Compras</h1>', unsafe_allow_html=True)
 
-# --- BLOCO DE BUSCA ---
+# --- BLOCO DE BUSCA (ORIGINAL) ---
 c_busca, c_limpa = st.columns([4, 1])
 with c_busca:
     busca_input = st.text_input("🔍 Pesquisar...", key=f"input_busca_{st.session_state.busca_key}", label_visibility="collapsed", placeholder="Pesquisar item...")
@@ -126,12 +131,11 @@ with c_limpa:
 
 busca_termo = normalizar_texto(busca_input)
 
-# --- Sidebar ---
+# --- Sidebar (Substituindo salvar em arquivo por salvar na nuvem) ---
 with st.sidebar:
     st.header("💾 NUVEM GOOGLE")
     nome_salvar = st.text_input("Nome da Lista:", placeholder="Ex: Compra Mensal")
     
-    # SALVAR NA NUVEM
     if st.button("📥 SALVAR NO GOOGLE", use_container_width=True):
         if conn and nome_salvar and st.session_state.selecionados:
             try:
@@ -144,15 +148,15 @@ with st.sidebar:
         else:
             st.warning("Dê um nome e marque itens!")
 
-    # CARREGAR DA NUVEM
     if conn:
         try:
             df_nuvem = conn.read(ttl=0)
             if not df_nuvem.empty:
                 st.divider()
                 escolha = st.selectbox("Recuperar lista:", ["Selecionar..."] + list(df_nuvem['nome_lista'].unique()))
-                if escolha != "Selecionar..." and st.button("📂 CARREGAR"):
+                if escolha != "Selecionar..." and st.button("📂 CARREGAR", use_container_width=True):
                     st.session_state.selecionados = json.loads(df_nuvem[df_nuvem['nome_lista'] == escolha].iloc[-1]['itens_json'])
+                    st.session_state.reset_trigger += 1
                     st.rerun()
         except:
             pass
@@ -173,7 +177,7 @@ with st.sidebar:
                 st.session_state.categorias["OUTROS"].sort(key=normalizar_texto)
                 st.rerun()
 
-# --- Exibição ---
+# --- Exibição Principal (ORIGINAL) ---
 itens_para_exportar = [f"{nome} ({dados['qtd']})" for nome, dados in st.session_state.selecionados.items()]
 
 if modo_mercado:
@@ -204,7 +208,7 @@ else:
                     else:
                         if p in st.session_state.selecionados: del st.session_state.selecionados[p]
 
-# --- Exportação (O seu original) ---
+# --- Exportação (ORIGINAL - WHATSAPP E IMAGEM) ---
 with st.sidebar:
     st.divider()
     if itens_para_exportar:
