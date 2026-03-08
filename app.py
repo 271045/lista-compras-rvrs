@@ -15,15 +15,15 @@ st.set_page_config(page_title="🛒 Lista Pro Nuvem ®rvrs", layout="wide", init
 # 2. Conexão com Google Sheets
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-except Exception as e:
-    st.error("Erro nos Secrets! Verifique a chave privada nos Secrets do Streamlit.")
+except:
+    st.error("Erro de conexão. Verifique os Secrets no Streamlit Cloud.")
 
 def remover_acentos(texto):
     if not texto: return ""
     return ''.join(c for c in unicodedata.normalize('NFD', str(texto))
                   if unicodedata.category(c) != 'Mn')
 
-# 3. Inicialização de Dados e Categorias
+# 3. Categorias e Itens
 if 'categorias' not in st.session_state:
     raw_data = {
         "MERCEARIA": ["AÇÚCAR", "AMENDOIM", "ARROZ", "AZEITE", "AZEITONA", "BATATA FRITA", "BISCOITOS", "BOLACHAS", "CAFÉ", "CALDO GALINHA", "CHÁ", "COCO RALADO", "CREME DE LEITE", "ERVILHA", "ESSÊNCIA", "EXTRATO TOMATE", "FARINHA DE MILHO", "FARINHA DE TRIGO", "FARINHA MANDIOCA", "FARINHA ROSCA", "FARINHA TEMPERADA", "FEIJÃO", "FERMENTO", "FILTRO CAFÉ", "FLOCÃO DE MILHO", "FÓSFORO", "FUBÁ", "GELATINA", "KETCHUP", "LASANHA", "LEITE", "LEITE CONDENSADO", "LEITE DE COCO", "LENTILHA", "MACARRÃO", "MAIONESE", "MAISENA", "MASSA PIZZA", "MILHO VERDE", "MISTURA P/ BOLO", "MOLHO INGLÊS", "MOLHO TOMATE", "MOSTARDA", "ÓLEO", "OVOS", "PALMITO", "PÓ ROYAL", "TAPIOCA", "TEMPERO", "TODDY"],
@@ -39,105 +39,107 @@ if 'categorias' not in st.session_state:
 
 if 'reset_trigger' not in st.session_state: st.session_state.reset_trigger = 0
 
-# 4. Funções de Apoio
-def limpar_tela():
+# 4. Funções de Imagem e Limpeza
+def limpar_tudo():
     for k in list(st.session_state.keys()):
         if k.startswith("check_"): st.session_state[k] = False
     st.session_state.reset_trigger += 1
     st.rerun()
 
-def gerar_imagem_lista(itens, motivo_txt):
-    largura = 550
-    espaco = 35
-    altura = 180 + (len(itens) * espaco) + 80
+def criar_imagem(lista_itens, motivo_str):
+    largura = 500
+    altura = 180 + (len(lista_itens) * 35) + 60
     img = Image.new('RGB', (largura, altura), color=(255, 255, 255))
-    d = ImageDraw.Draw(img)
+    draw = ImageDraw.Draw(img)
     try:
-        f_bold = ImageFont.load_default(size=22)
-        f_norm = ImageFont.load_default(size=18)
+        f_titulo = ImageFont.load_default(size=24)
+        f_texto = ImageFont.load_default(size=18)
     except:
-        f_bold = f_norm = ImageFont.load_default()
-    d.text((30, 30), "LISTA DE COMPRAS", fill=(0,0,0), font=f_bold)
-    d.text((30, 60), f"DATA: {datetime.now().strftime('%d/%m/%Y')}", fill=(100,100,100), font=f_norm)
-    if motivo_txt:
-        d.text((30, 95), f"MOTIVO: {motivo_txt.upper()}", fill=(0,51,153), font=f_bold)
-    y = 140
-    for it in itens:
-        d.text((40, y), f"[X] {it}", fill=(0,0,0), font=f_norm)
-        y += espaco
+        f_titulo = f_texto = ImageFont.load_default()
+    
+    draw.text((30, 30), "🛒 LISTA DE COMPRAS", fill=(0,0,0), font=f_titulo)
+    draw.text((30, 65), f"DATA: {datetime.now().strftime('%d/%m/%Y')}", fill=(80,80,80), font=f_texto)
+    if motivo_str:
+        draw.text((30, 95), f"MOTIVO: {motivo_str.upper()}", fill=(0,51,153), font=f_titulo)
+    
+    y_pos = 145
+    for item in lista_itens:
+        draw.text((40, y_pos), f"[X] {item}", fill=(0,0,0), font=f_texto)
+        y_pos += 35
+    
     buf = io.BytesIO()
     img.save(buf, format='PNG')
     return buf.getvalue()
 
-# --- INTERFACE ---
-st.markdown("<h1 style='text-align:center;'>🛒 Lista de Compras Nuvem ®rvrs</h1>", unsafe_allow_html=True)
+# --- INTERFACE PRINCIPAL ---
+st.title("🛒 Lista de Compras ®rvrs")
 
-# 5. SIDEBAR
+# 5. Barra Lateral (Sidebar) - SALVAR E CARREGAR
 with st.sidebar:
     st.header("💾 NUVEM & OPÇÕES")
-    data_hoje = datetime.now().strftime('%d/%m/%Y')
-    st.info(f"📅 Data: {data_hoje}")
-    
-    motivo_input = st.text_input("Motivo da Compra:", placeholder="Ex: Mensal", key=f"mot_{st.session_state.reset_trigger}")
+    motivo_compra = st.text_input("Motivo da Compra:", placeholder="Ex: Churrasco", key=f"mot_{st.session_state.reset_trigger}")
     modo_mercado = st.toggle("🛒 MODO MERCADO")
     
-    if st.button("🗑️ LIMPAR TELA", use_container_width=True): limpar_tela()
+    if st.button("🗑️ LIMPAR TELA", use_container_width=True): limpar_tudo()
     
     st.divider()
-    # SALVAR
+    
+    # Salvar na Planilha
     if st.button("📥 SALVAR NO GOOGLE", use_container_width=True):
-        sel = [k.split("_")[1] for k, v in st.session_state.items() if k.startswith("check_") and v]
-        if motivo_input and sel:
-            df_old = conn.read(ttl=0)
-            novo = pd.DataFrame([{"data": data_hoje, "nome_lista": motivo_input.upper(), "itens_json": json.dumps(sel, ensure_ascii=False)}])
-            df_new = pd.concat([df_old, novo], ignore_index=True)
-            conn.update(data=df_new)
-            st.success("Salvo na Planilha!")
-        else: st.warning("Dê um nome e marque itens!")
+        marcados = [k.split("_")[1] for k, v in st.session_state.items() if k.startswith("check_") and v]
+        if motivo_compra and marcados:
+            df_atual = conn.read(ttl=0)
+            nova_linha = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y"), "nome_lista": motivo_compra.upper(), "itens_json": json.dumps(marcados)}])
+            df_final = pd.concat([df_atual, nova_linha], ignore_index=True)
+            conn.update(data=df_final)
+            st.success("Salvo com sucesso!")
+        else: st.warning("Defina o motivo e escolha itens.")
 
-    # CARREGAR
+    # Abrir Listas Salvas
     try:
-        df_nuvem = conn.read(ttl=0)
-        if not df_nuvem.empty:
-            lista_nomes = ["Selecionar..."] + list(df_nuvem['nome_lista'].unique())
-            escolha = st.selectbox("Abrir lista antiga:", lista_nomes)
-            if escolha != "Selecionar..." and st.button("📂 CARREGAR ESTA"):
-                dados = json.loads(df_nuvem[df_nuvem['nome_lista'] == escolha].iloc[-1]['itens_json'])
+        df_lido = conn.read(ttl=0)
+        if not df_lido.empty:
+            opcoes = ["Selecionar..."] + list(df_lido['nome_lista'].unique())
+            escolha = st.selectbox("Abrir Lista Antiga:", opcoes)
+            if escolha != "Selecionar..." and st.button("📂 CARREGAR"):
+                itens_recuperados = json.loads(df_lido[df_lido['nome_lista'] == escolha].iloc[-1]['itens_json'])
                 for k in st.session_state.keys():
                     if k.startswith("check_"): st.session_state[k] = False
-                for item in dados:
+                for it in itens_recuperados:
                     for cat in st.session_state.categorias.keys():
-                        if f"check_{item}_{cat}" in st.session_state: st.session_state[f"check_{item}_{cat}"] = True
+                        if f"check_{it}_{cat}" in st.session_state: st.session_state[f"check_{it}_{cat}"] = True
                 st.rerun()
     except: pass
 
-# 6. EXIBIÇÃO PRINCIPAL
-itens_selecionados = [k.split("_")[1] for k, v in st.session_state.items() if k.startswith("check_") and v]
+# 6. Exibição da Grade de Produtos
+selecionados = [k.split("_")[1] for k, v in st.session_state.items() if k.startswith("check_") and v]
 
 if modo_mercado:
-    st.markdown(f"## 🛒 Modo Mercado - {len(itens_selecionados)} itens")
-    if itens_selecionados:
-        for item in sorted(itens_selecionados):
-            st.markdown(f"### [ ] {item}")
-    else: st.info("Selecione itens na grade primeiro.")
+    st.subheader(f"🛒 Itens Selecionados ({len(selecionados)})")
+    if selecionados:
+        for s in sorted(selecionados):
+            st.markdown(f"✅ **{s}**")
+    else: st.info("Marque itens na tela normal primeiro.")
 else:
-    col1, col2, col3 = st.columns(3)
+    c1, c2, c3 = st.columns(3)
     for i, (cat, prods) in enumerate(st.session_state.categorias.items()):
-        with [col1, col2, col3][i % 3]:
+        with [c1, c2, c3][i % 3]:
             st.subheader(cat)
             for p in prods:
                 st.checkbox(p, key=f"check_{p}_{cat}")
 
-# 7. EXPORTAÇÃO
-if itens_selecionados:
+# 7. Botões de Enviar (WhatsApp e Imagem)
+if selecionados:
     st.divider()
-    c1, c2 = st.columns(2)
-    with c1:
-        img_b = gerar_imagem_lista(sorted(itens_selecionados), motivo_input)
-        st.download_button("🖼️ BAIXAR IMAGEM", img_b, "lista.png", use_container_width=True)
-    with c2:
-        msg = f"*LISTA DE COMPRAS ({motivo_input})*\n*Data: {data_hoje}*\n\n" + "\n".join([f"[X] {i}" for i in sorted(itens_selecionados)])
-        url_wa = f"https://wa.me/?text={urllib.parse.quote(msg + '\n\n_by ®rvrs_')}"
-        st.markdown(f'<a href="{url_wa}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:8px;text-align:center;font-weight:bold;font-size:18px;">📲 WHATSAPP</div></a>', unsafe_allow_html=True)
+    col_img, col_wa = st.columns(2)
+    
+    with col_img:
+        img_data = criar_imagem(sorted(selecionados), motivo_compra)
+        st.download_button("🖼️ BAIXAR IMAGEM DA LISTA", img_data, "lista_compras.png", use_container_width=True)
+        
+    with col_wa:
+        msg_texto = f"*LISTA DE COMPRAS ({motivo_compra})*\n*Data: {datetime.now().strftime('%d/%m/%Y')}*\n\n" + "\n".join([f"- {i}" for i in sorted(selecionados)])
+        wa_url = f"https://wa.me/?text={urllib.parse.quote(msg_texto)}"
+        st.markdown(f'<a href="{wa_url}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:15px;border-radius:10px;text-align:center;font-weight:bold;font-size:18px;">📲 ENVIAR PARA WHATSAPP</div></a>', unsafe_allow_html=True)
 
-st.markdown("<hr><p style='text-align:center;'>2026 | Oliveira-MG | by ®rvrs</p>", unsafe_allow_html=True)
+st.markdown("<br><hr><p style='text-align:center;'>2026 | Oliveira-MG | ®rvrs</p>", unsafe_allow_html=True)
